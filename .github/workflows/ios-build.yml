@@ -183,9 +183,14 @@ jobs:
             echo "Found and copied app bundle: $APP_PATH"
           else
             echo "Could not find built app bundle"
-            echo "Searching all locations:"
-            find "$DERIVED_DATA_PATH" -name "${{ env.PRODUCT_NAME }}.app" -type d || true
-            find . -name "${{ env.PRODUCT_NAME }}.app" -type d || true
+            echo "Searching all locations for .app files:"
+            find "$DERIVED_DATA_PATH" -name "*.app" -type d || true
+            find . -name "*.app" -type d || true
+            echo "Searching for any SoundToLight* files:"
+            find "$DERIVED_DATA_PATH" -name "*SoundToLight*" -type f || true
+            find . -name "*SoundToLight*" -type f || true
+            echo "Listing build products directory:"
+            find "$DERIVED_DATA_PATH" -path "*/Build/Products/Release-iphoneos/*" -type f || true
             exit 1
           fi
 
