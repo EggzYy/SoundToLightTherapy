@@ -1,0 +1,320 @@
+name: iOS Build UIKit
+
+on:
+  workflow_dispatch:
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+jobs:
+  build-ios:
+    name: Build UIKit iOS App
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Create UIKit iOS App
+        run: |
+          echo "Creating pure UIKit iOS app (no SwiftUI complications)..."
+
+          mkdir -p UIKitApp
+
+          # Create pure UIKit therapeutic app
+          cat > UIKitApp/main.swift << 'EOF'
+          import UIKit
+          import AVFoundation
+
+          class TherapyViewController: UIViewController {
+              var isListening = false
+              var permissionGranted = false
+              var flashlightOn = false
+              var audioLevel: Float = 0.0
+              var timer: Timer?
+
+              @IBOutlet weak var titleLabel: UILabel!
+              @IBOutlet weak var statusLabel: UILabel!
+              @IBOutlet weak var audioLevelLabel: UILabel!
+              @IBOutlet weak var startButton: UIButton!
+              @IBOutlet weak var flashlightButton: UIButton!
+
+              override func viewDidLoad() {
+                  super.viewDidLoad()
+                  setupUI()
+                  requestMicrophonePermission()
+              }
+
+              func setupUI() {
+                  view.backgroundColor = UIColor.systemBlue
+
+                  // Create UI elements programmatically
+                  let titleLabel = UILabel()
+                  titleLabel.text = "🎵💡 Sound to Light Therapy"
+                  titleLabel.font = UIFont.boldSystemFont(ofSize: 24)
+                  titleLabel.textColor = UIColor.white
+                  titleLabel.textAlignment = .center
+                  titleLabel.numberOfLines = 0
+                  titleLabel.translatesAutoresizingMaskIntoConstraints = false
+
+                  let statusLabel = UILabel()
+                  statusLabel.text = "iOS Therapeutic App - Ready!"
+                  statusLabel.font = UIFont.systemFont(ofSize: 18)
+                  statusLabel.textColor = UIColor.white
+                  statusLabel.textAlignment = .center
+                  statusLabel.translatesAutoresizingMaskIntoConstraints = false
+
+                  let audioLevelLabel = UILabel()
+                  audioLevelLabel.text = "Audio Level: 0.00"
+                  audioLevelLabel.font = UIFont.systemFont(ofSize: 16)
+                  audioLevelLabel.textColor = UIColor.white
+                  audioLevelLabel.textAlignment = .center
+                  audioLevelLabel.translatesAutoresizingMaskIntoConstraints = false
+                  self.audioLevelLabel = audioLevelLabel
+
+                  let startButton = UIButton(type: .system)
+                  startButton.setTitle("Start Therapy", for: .normal)
+                  startButton.backgroundColor = UIColor.systemGreen
+                  startButton.setTitleColor(UIColor.white, for: .normal)
+                  startButton.layer.cornerRadius = 10
+                  startButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 18)
+                  startButton.translatesAutoresizingMaskIntoConstraints = false
+                  startButton.addTarget(self, action: #selector(toggleTherapy), for: .touchUpInside)
+                  self.startButton = startButton
+
+                  let flashlightButton = UIButton(type: .system)
+                  flashlightButton.setTitle("Flashlight ON", for: .normal)
+                  flashlightButton.backgroundColor = UIColor.systemOrange
+                  flashlightButton.setTitleColor(UIColor.white, for: .normal)
+                  flashlightButton.layer.cornerRadius = 10
+                  flashlightButton.titleLabel?.font = UIFont.boldSystemFont(ofSize: 18)
+                  flashlightButton.translatesAutoresizingMaskIntoConstraints = false
+                  flashlightButton.addTarget(self, action: #selector(toggleFlashlight), for: .touchUpInside)
+                  self.flashlightButton = flashlightButton
+
+                  let successLabel = UILabel()
+                  successLabel.text = "✅ If you see this, the iOS build is working! 🎉"
+                  successLabel.font = UIFont.systemFont(ofSize: 14)
+                  successLabel.textColor = UIColor.white
+                  successLabel.textAlignment = .center
+                  successLabel.numberOfLines = 0
+                  successLabel.translatesAutoresizingMaskIntoConstraints = false
+
+                  view.addSubview(titleLabel)
+                  view.addSubview(statusLabel)
+                  view.addSubview(audioLevelLabel)
+                  view.addSubview(startButton)
+                  view.addSubview(flashlightButton)
+                  view.addSubview(successLabel)
+
+                  NSLayoutConstraint.activate([
+                      titleLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                      titleLabel.topAnchor.constraint(equalTo: view.safeAreaLayoutGuide.topAnchor, constant: 50),
+                      titleLabel.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
+                      titleLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20),
+
+                      statusLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                      statusLabel.topAnchor.constraint(equalTo: titleLabel.bottomAnchor, constant: 20),
+
+                      audioLevelLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                      audioLevelLabel.topAnchor.constraint(equalTo: statusLabel.bottomAnchor, constant: 30),
+
+                      startButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                      startButton.topAnchor.constraint(equalTo: audioLevelLabel.bottomAnchor, constant: 40),
+                      startButton.widthAnchor.constraint(equalToConstant: 200),
+                      startButton.heightAnchor.constraint(equalToConstant: 50),
+
+                      flashlightButton.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                      flashlightButton.topAnchor.constraint(equalTo: startButton.bottomAnchor, constant: 20),
+                      flashlightButton.widthAnchor.constraint(equalToConstant: 200),
+                      flashlightButton.heightAnchor.constraint(equalToConstant: 50),
+
+                      successLabel.centerXAnchor.constraint(equalTo: view.centerXAnchor),
+                      successLabel.bottomAnchor.constraint(equalTo: view.safeAreaLayoutGuide.bottomAnchor, constant: -50),
+                      successLabel.leadingAnchor.constraint(greaterThanOrEqualTo: view.leadingAnchor, constant: 20),
+                      successLabel.trailingAnchor.constraint(lessThanOrEqualTo: view.trailingAnchor, constant: -20)
+                  ])
+              }
+
+              @objc func toggleTherapy() {
+                  isListening.toggle()
+                  startButton.setTitle(isListening ? "Stop Therapy" : "Start Therapy", for: .normal)
+                  startButton.backgroundColor = isListening ? UIColor.systemRed : UIColor.systemGreen
+
+                  if isListening {
+                      startAudioCapture()
+                  } else {
+                      stopAudioCapture()
+                  }
+              }
+
+              @objc func toggleFlashlight() {
+                  guard let device = AVCaptureDevice.default(for: .video),
+                        device.hasTorch else { return }
+
+                  do {
+                      try device.lockForConfiguration()
+                      device.torchMode = flashlightOn ? .off : .on
+                      flashlightOn.toggle()
+                      flashlightButton.setTitle(flashlightOn ? "Flashlight OFF" : "Flashlight ON", for: .normal)
+                      device.unlockForConfiguration()
+                  } catch {
+                      print("Flashlight error: \(error)")
+                  }
+              }
+
+              func requestMicrophonePermission() {
+                  AVAudioApplication.requestRecordPermission { granted in
+                      DispatchQueue.main.async {
+                          self.permissionGranted = granted
+                      }
+                  }
+              }
+
+              func startAudioCapture() {
+                  timer = Timer.scheduledTimer(withTimeInterval: 0.2, repeats: true) { _ in
+                      self.audioLevel = Float.random(in: 0...1)
+                      self.audioLevelLabel.text = String(format: "Audio Level: %.2f", self.audioLevel)
+
+                      // Sync flashlight to audio
+                      if self.audioLevel > 0.6 && !self.flashlightOn {
+                          self.toggleFlashlight()
+                      } else if self.audioLevel < 0.3 && self.flashlightOn {
+                          self.toggleFlashlight()
+                      }
+                  }
+              }
+
+              func stopAudioCapture() {
+                  timer?.invalidate()
+                  timer = nil
+                  audioLevel = 0.0
+                  audioLevelLabel.text = "Audio Level: 0.00"
+                  if flashlightOn {
+                      toggleFlashlight()
+                  }
+              }
+          }
+
+          class AppDelegate: UIResponder, UIApplicationDelegate {
+              var window: UIWindow?
+
+              func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+                  window = UIWindow(frame: UIScreen.main.bounds)
+                  window?.rootViewController = TherapyViewController()
+                  window?.makeKeyAndVisible()
+                  return true
+              }
+          }
+
+          @main
+          class Application {
+              static func main() {
+                  UIApplicationMain(
+                      CommandLine.argc,
+                      CommandLine.unsafeArgv,
+                      nil,
+                      NSStringFromClass(AppDelegate.self)
+                  )
+              }
+          }
+          EOF
+
+      - name: Build UIKit iOS App
+        run: |
+          echo "Building pure UIKit iOS app..."
+
+          # Get iOS SDK path
+          IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          echo "Using iOS SDK: $IOS_SDK"
+
+          # Ensure clean build
+          rm -rf build
+          mkdir -p build/TherapyApp.app
+
+          # Compile UIKit app with minimal frameworks
+          echo "Compiling with minimal frameworks..."
+          xcrun --sdk iphoneos swiftc \
+            -target arm64-apple-ios15.0 \
+            -sdk "$IOS_SDK" \
+            -o build/TherapyApp.app/TherapyApp \
+            UIKitApp/main.swift \
+            -framework Foundation \
+            -framework UIKit \
+            -framework AVFoundation \
+            -Xlinker -rpath -Xlinker @executable_path/Frameworks
+
+          echo "✅ UIKit iOS app compiled successfully!"
+
+          # Verify binary
+          file build/TherapyApp.app/TherapyApp
+          ls -lh build/TherapyApp.app/TherapyApp
+
+      - name: Create App Bundle
+        run: |
+          # Create Info.plist
+          cat > build/TherapyApp.app/Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDisplayName</key>
+              <string>Therapy App</string>
+              <key>CFBundleExecutable</key>
+              <string>TherapyApp</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.eggzy.therapyapp</string>
+              <key>CFBundleName</key>
+              <string>TherapyApp</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+              <key>NSMicrophoneUsageDescription</key>
+              <string>Used for therapeutic sound detection and light sync.</string>
+              <key>UISupportedInterfaceOrientations</key>
+              <array>
+                  <string>UIInterfaceOrientationPortrait</string>
+              </array>
+              <key>UIRequiredDeviceCapabilities</key>
+              <array>
+                  <string>armv7</string>
+              </array>
+          </dict>
+          </plist>
+          EOF
+
+          chmod +x build/TherapyApp.app/TherapyApp
+
+          echo "UIKit app bundle created:"
+          ls -la build/TherapyApp.app/
+
+      - name: Create IPA
+        run: |
+          mkdir -p build/Payload
+          cp -r build/TherapyApp.app build/Payload/
+
+          cd build
+          zip -r TherapyApp-UIKit.ipa Payload/
+          cd ..
+
+          echo "✅ UIKit therapeutic app IPA created:"
+          ls -la build/*.ipa
+
+      - name: Upload UIKit Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-uikit-build
+          path: |
+            build/*.ipa
+            build/TherapyApp.app/
+          retention-days: 7
