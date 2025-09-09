@@ -1,5 +1,4 @@
 import Foundation
-import SoundToLightTherapy
 import SwiftUI
 
 // Pure SwiftUI implementation for iOS deployment

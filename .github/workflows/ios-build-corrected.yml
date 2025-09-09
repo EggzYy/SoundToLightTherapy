@@ -38,8 +38,8 @@ jobs:
           mkdir -p build/TherapyApp.app
 
           # List Swift source files to be compiled
-          echo "Swift source files to compile:"
-          find Sources -name "*.swift" -type f
+          echo "Swift source files to compile (excluding test files):"
+          find Sources/SoundToLightTherapy -name "*.swift" -type f
 
           # Build the complete therapeutic app with xcrun swiftc (fixed: removed conflicting flags)
           echo "Compiling complete therapeutic app..."
@@ -47,7 +47,7 @@ jobs:
             -target arm64-apple-ios15.0 \
             -sdk "$IOS_SDK" \
             -o build/TherapyApp.app/TherapyApp \
-            $(find Sources -name "*.swift" -type f) \
+            $(find Sources/SoundToLightTherapy -name "*.swift" -type f) \
             -framework Foundation \
             -framework UIKit \
             -framework AVFoundation \
