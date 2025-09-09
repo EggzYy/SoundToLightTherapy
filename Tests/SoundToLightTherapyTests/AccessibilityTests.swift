@@ -12,7 +12,7 @@ final class AccessibilityTests: XCTestCase {
     // MARK: - VoiceOverSupport Tests
 
     #if canImport(SwiftUI)
-        func testVoiceOverConfigureAccessibility() {
+        @MainActor func testVoiceOverConfigureAccessibility() {
             let testView = Text("Test")
             let configuredView = VoiceOverSupport.configureAccessibility(
                 for: testView,
@@ -76,7 +76,7 @@ final class AccessibilityTests: XCTestCase {
     }
 
     #if canImport(SwiftUI)
-        func testReducedMotionWithConditionalAnimation() {
+        @MainActor func testReducedMotionWithConditionalAnimation() {
             let testView = Text("Test")
             let animatedView = ReducedMotionSupport.withConditionalAnimation(content: { testView })
             XCTAssertNotNil(animatedView)
@@ -217,7 +217,7 @@ final class AccessibilityTests: XCTestCase {
     }
 
     #if canImport(SwiftUI)
-        func testAccessibilityIntegration() {
+        @MainActor func testAccessibilityIntegration() {
             // Test integration between different accessibility utilities
             let testView = Text("Integration Test")
 
