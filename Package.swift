@@ -9,7 +9,6 @@ let package = Package(
         .macOS(.v12),
     ],
     products: [
-
         .library(
             name: "SoundToLightTherapy",
             targets: ["SoundToLightTherapy"]
@@ -20,15 +19,13 @@ let package = Package(
         ),
     ],
     dependencies: [
-        .package(
-            url: "https://github.com/stackotter/swift-cross-ui",
-            revision: "a02da752cf9cd50c99b3ce43d573975b69225d58")
+        // Removed SwiftCrossUI dependency to fix macro plugin issues
     ],
     targets: [
         .target(
             name: "SoundToLightTherapy",
             dependencies: [
-                .product(name: "SwiftCrossUI", package: "swift-cross-ui")
+                // Pure SwiftUI implementation - no external dependencies
             ],
             path: "Sources/SoundToLightTherapy",
             exclude: ["main.swift"],
@@ -39,9 +36,7 @@ let package = Package(
         .executableTarget(
             name: "SoundToLightTherapyApp",
             dependencies: [
-                .target(name: "SoundToLightTherapy"),
-                .product(name: "SwiftCrossUI", package: "swift-cross-ui"),
-                .product(name: "DefaultBackend", package: "swift-cross-ui"),
+                .target(name: "SoundToLightTherapy")
             ],
             path: "Sources/SoundToLightTherapy",
             sources: ["main.swift"]

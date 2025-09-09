@@ -1,5 +1,4 @@
 import Foundation
-import SwiftCrossUI
 import SwiftUI
 
 #if canImport(UIKit)

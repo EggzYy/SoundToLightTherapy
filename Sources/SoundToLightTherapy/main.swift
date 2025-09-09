@@ -1,13 +1,10 @@
-import DefaultBackend
 import Foundation
 import SoundToLightTherapy
-import SwiftCrossUI
+import SwiftUI
 
-// Create the main app instance using SwiftCrossUI
+// Pure SwiftUI implementation for iOS deployment
 @main
 struct SoundToLightTherapyApplication: App {
-    typealias Backend = DefaultBackend
-
     var body: some Scene {
         WindowGroup("Sound to Light Therapy") {
             TherapyView()

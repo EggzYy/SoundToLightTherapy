@@ -1,6 +1,5 @@
 import Foundation
 import SwiftUI
-import SwiftCrossUI
 
 /// Main therapy view with comprehensive accessibility support
 public struct TherapyView: SwiftUI.View {
