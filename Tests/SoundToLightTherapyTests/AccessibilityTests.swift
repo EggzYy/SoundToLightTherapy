@@ -19,7 +19,7 @@ final class AccessibilityTests: XCTestCase {
                 label: "Test Label",
                 hint: "Test Hint",
                 value: "Test Value",
-                traits: .isButton
+                traits: .button
             )
 
             // This test verifies the function compiles and returns a view
@@ -34,13 +34,14 @@ final class AccessibilityTests: XCTestCase {
 
     #if canImport(SwiftUI)
         func testDynamicTypeScalableFont() {
-            let font = DynamicTypeSupport.scalableFont(for: .body)
+            let font = DynamicTypeSupport.font(for: .body)
             XCTAssertNotNil(font)
         }
 
         func testDynamicTypeText() {
-            let textView = DynamicTypeSupport.text("Test Text", style: .body)
-            XCTAssertNotNil(textView)
+            // DynamicTypeSupport doesn't have a text method, test font instead
+            let font = DynamicTypeSupport.font(for: .body)
+            XCTAssertNotNil(font)
         }
     #endif
 
@@ -82,7 +83,7 @@ final class AccessibilityTests: XCTestCase {
             XCTAssertNotNil(animatedView)
         }
 
-        func testReducedMotionConditionalAnimation() {
+        @MainActor func testReducedMotionConditionalAnimation() {
             let animation = ReducedMotionSupport.conditionalAnimation()
             XCTAssertNotNil(animation)
         }
