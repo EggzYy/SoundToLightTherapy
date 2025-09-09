@@ -151,10 +151,10 @@ jobs:
       - name: Build for iOS Simulator (Debug)
         if: github.event.inputs.build_type == 'debug' || github.event.inputs.build_type == ''
         run: |
-          # Use xcodebuild for iOS simulator
+          # Use xcodebuild for iOS simulator with available simulator
           xcodebuild build \
             -scheme ${{ env.SCHEME_NAME }} \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=latest' \
+            -destination 'platform=iOS Simulator,name=Any iOS Simulator Device' \
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             ONLY_ACTIVE_ARCH=NO
@@ -253,6 +253,6 @@ jobs:
             xcodebuild test \
               -project SoundToLightTherapy.xcodeproj \
               -scheme ${{ env.SCHEME_NAME }} \
-              -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=latest' \
+              -destination 'platform=iOS Simulator,name=Any iOS Simulator Device' \
               -configuration Debug
           fi
