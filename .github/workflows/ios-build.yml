@@ -160,7 +160,6 @@ jobs:
             ONLY_ACTIVE_ARCH=NO
 
       - name: Build for iOS Device (Release)
-        if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
         run: |
           # Use xcodebuild with Swift Package Manager
           xcodebuild build \
@@ -170,8 +169,7 @@ jobs:
             CODE_SIGNING_ALLOWED=NO \
             ONLY_ACTIVE_ARCH=NO
 
-      - name: Create iOS App Bundle (Release)
-        if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
+      - name: Create iOS App Bundle
         run: |
           # Find the built app bundle from xcodebuild
           # xcodebuild puts output in derived data, let's find it
@@ -190,11 +188,13 @@ jobs:
             echo "Found and copied app bundle: $APP_PATH"
           else
             echo "Could not find built app bundle"
+            echo "Searching all locations:"
+            find "$DERIVED_DATA_PATH" -name "${{ env.PRODUCT_NAME }}.app" -type d || true
+            find . -name "${{ env.PRODUCT_NAME }}.app" -type d || true
             exit 1
           fi
 
-      - name: Create IPA (Release)
-        if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
+      - name: Create IPA
         run: |
           # Create IPA manually from app bundle
           mkdir -p build/Payload
@@ -209,7 +209,6 @@ jobs:
           ls -la build/*.ipa
 
       - name: Upload Build Artifacts
-        if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
         uses: actions/upload-artifact@v4
         with:
           name: ios-build-artifacts
