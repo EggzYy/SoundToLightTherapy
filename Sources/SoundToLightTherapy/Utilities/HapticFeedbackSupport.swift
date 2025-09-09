@@ -279,7 +279,7 @@ extension View {
     /// - Note: SwiftCrossUI compatible - removed due to unsupported onTapGesture behavior
     /// TODO: Implement haptic feedback for SwiftCrossUI when gesture support is added
     public func withHapticFeedback(_ type: HapticFeedbackType, respectReducedMotion: Bool = true)
-        -> some View
+        -> some SwiftUI.View
     {
         // SwiftCrossUI doesn't support the onTapGesture modifier in the same way
         // Return self for now - haptic feedback will be handled manually in button actions

@@ -265,7 +265,7 @@ extension View {
     /// - Parameter textStyle: The text style to apply (e.g., .title, .body, .caption)
     /// - Returns: A modified view with scalable font applied
     /// - Note: SwiftCrossUI compatible - uses basic font sizing without dynamic scaling
-    public func scalableFont(_ textStyle: TextStyle) -> some View {
+    public func scalableFont(_ textStyle: TextStyle) -> some SwiftUI.View {
         return self.font(DynamicTypeSupport.font(for: textStyle))
     }
 
@@ -276,7 +276,7 @@ extension View {
     ///
     /// - Returns: A view configured to respond to content size category changes
     /// - Note: SwiftCrossUI compatible - returns self as no dynamic scaling is available
-    public func adaptsToContentSizeCategory() -> some View {
+    public func adaptsToContentSizeCategory() -> some SwiftUI.View {
         // SwiftCrossUI doesn't support dynamic type scaling, so return self
         return self
     }

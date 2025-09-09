@@ -88,13 +88,13 @@ public struct VoiceOverSupport {
     /// - Note: SwiftCrossUI compatible - accessibility methods removed due to unsupported APIs
     /// TODO: Implement accessibility support when SwiftCrossUI adds accessibility APIs
     @MainActor
-    public static func configureAccessibility<V: View>(
+    public static func configureAccessibility<V: SwiftUI.View>(
         for view: V,
         label: String,
         hint: String? = nil,
         value: String? = nil,
         traits: AccessibilityTraits = []
-    ) -> some View {
+    ) -> some SwiftUI.View {
         // SwiftCrossUI doesn't support accessibility modifiers yet
         // Return the view as-is for now
         return view

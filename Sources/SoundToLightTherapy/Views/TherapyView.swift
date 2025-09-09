@@ -2,7 +2,7 @@ import Foundation
 import SwiftCrossUI
 
 /// Main therapy view with comprehensive accessibility support
-public struct TherapyView: View {
+public struct TherapyView: SwiftUI.View {
     // State properties for data
     @State private var targetFrequency: Float = 10.0
     @State private var sessionDuration: TimeInterval = 300

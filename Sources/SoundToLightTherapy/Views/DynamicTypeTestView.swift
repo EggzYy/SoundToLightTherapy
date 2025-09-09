@@ -11,7 +11,7 @@ import Foundation
     ///
     /// - Note: This view is primarily for development and testing purposes to validate
     ///   the Dynamic Type implementation before deployment.
-    public struct DynamicTypeTestView: View {
+    public struct DynamicTypeTestView: SwiftUI.View {
 
         public init() {}
 

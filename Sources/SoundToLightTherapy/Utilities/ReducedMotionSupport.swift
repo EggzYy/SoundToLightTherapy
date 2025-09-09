@@ -74,9 +74,9 @@ public struct ReducedMotionSupport {
 
     /// Wraps content with conditional animation support
     @MainActor
-    public static func withConditionalAnimation<Content: View>(
+    public static func withConditionalAnimation<Content: SwiftUI.View>(
         @ViewBuilder content: @escaping () -> Content
-    ) -> some View {
+    ) -> some SwiftUI.View {
         #if canImport(SwiftUI)
             Group {
                 if isReducedMotionEnabled {
@@ -93,10 +93,10 @@ public struct ReducedMotionSupport {
 
     /// Provides alternative static content when motion is reduced
     @MainActor
-    public static func motionAlternative<AnimatedContent: View, StaticContent: View>(
+    public static func motionAlternative<AnimatedContent: View, StaticContent: SwiftUI.View>(
         animated: @escaping () -> AnimatedContent,
         staticContent: @escaping () -> StaticContent
-    ) -> some View {
+    ) -> some SwiftUI.View {
         Group {
             if isReducedMotionEnabled {
                 staticContent()
@@ -111,7 +111,7 @@ public struct ReducedMotionSupport {
 extension View {
     /// Conditionally applies behavior based on reduced motion settings
     @MainActor
-    public func respectsReducedMotion() -> some View {
+    public func respectsReducedMotion() -> some SwiftUI.View {
         return self
     }
 
@@ -120,7 +120,7 @@ extension View {
     public func conditionalAnimation<V: Equatable>(
         _ animation: Any?,
         value: V
-    ) -> some View {
+    ) -> some SwiftUI.View {
         #if canImport(SwiftUI)
             if ReducedMotionSupport.isReducedMotionEnabled {
                 return AnyView(self)
@@ -134,9 +134,9 @@ extension View {
 
     /// Provides alternative presentations based on motion preference
     @MainActor
-    public func motionSensitivePresentation<AlternativeContent: View>(
+    public func motionSensitivePresentation<AlternativeContent: SwiftUI.View>(
         @ViewBuilder alternative: @escaping () -> AlternativeContent
-    ) -> some View {
+    ) -> some SwiftUI.View {
         if ReducedMotionSupport.isReducedMotionEnabled {
             return AnyView(alternative())
         } else {

@@ -403,7 +403,7 @@ extension ColorContrastSupport {
             foreground: AccessibleColor,
             background: AccessibleColor,
             level: WCAGContrastLevel = .normalText
-        ) -> some View {
+        ) -> some SwiftUI.View {
             return
                 self
                 .foregroundColor(Color(foreground.toUIColor()))
@@ -422,7 +422,7 @@ extension ColorContrastSupport {
             background: AccessibleColor,
             fallbackForeground: AccessibleColor,
             level: WCAGContrastLevel = .normalText
-        ) -> some View {
+        ) -> some SwiftUI.View {
             let isCompliant = ColorContrastSupport.meetsContrastRequirements(
                 foreground: foreground,
                 background: background,
@@ -454,7 +454,7 @@ extension ColorContrastSupport {
     extension View {
         /// Configures the view to adapt to color scheme changes while maintaining contrast
         /// - Returns: A view configured to respond to color scheme changes
-        public func adaptsToColorScheme() -> some View {
+        public func adaptsToColorScheme() -> some SwiftUI.View {
             self.environment(\.colorScheme, .light)
         }
     }
