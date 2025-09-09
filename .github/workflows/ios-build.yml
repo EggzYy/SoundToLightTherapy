@@ -156,11 +156,22 @@ jobs:
 
       - name: Build for iOS Device (Release)
         run: |
-          # Use swift build directly for iOS
-          swift build \
-            --configuration release \
-            --arch arm64 \
-            --triple arm64-apple-ios17.0
+          # Build using Xcode's swift compiler with iOS SDK
+          DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
+          IOS_SDK_PATH="$DEVELOPER_DIR/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"
+
+          # Build the executable directly with proper iOS settings
+          swiftc -target arm64-apple-ios17.0 \
+            -sdk "$IOS_SDK_PATH" \
+            -O \
+            -I Sources/SoundToLightTherapy \
+            -o SoundToLightTherapyApp \
+            Sources/SoundToLightTherapy/App.swift \
+            Sources/SoundToLightTherapy/**/*.swift \
+            -framework SwiftUI \
+            -framework Foundation \
+            -framework AVFAudio \
+            -framework UIKit
 
       - name: Create iOS App Bundle
         run: |

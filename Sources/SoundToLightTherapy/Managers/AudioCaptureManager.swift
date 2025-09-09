@@ -140,8 +140,14 @@ public actor AudioCaptureManager {
     func requestMicrophonePermission() async -> Bool {
         await withCheckedContinuation { continuation in
             #if os(iOS)
-            AVAudioSession.sharedInstance().requestRecordPermission { granted in
-                continuation.resume(returning: granted)
+            if #available(iOS 17.0, *) {
+                AVAudioApplication.requestRecordPermission { granted in
+                    continuation.resume(returning: granted)
+                }
+            } else {
+                AVAudioSession.sharedInstance().requestRecordPermission { granted in
+                    continuation.resume(returning: granted)
+                }
             }
             #elseif os(macOS)
             if #available(macOS 14.0, *) {

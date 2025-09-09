@@ -1,0 +1,160 @@
+name: iOS Build Final
+
+on:
+  workflow_dispatch:
+
+env:
+  DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
+
+jobs:
+  build-ios:
+    name: Build iOS App (Final Fix)
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Show Environment
+        run: |
+          xcode-select --print-path
+          xcodebuild -version
+          swift --version
+          xcrun --sdk iphoneos --show-sdk-path
+
+      - name: Create iOS Build Directory
+        run: |
+          echo "Creating iOS build structure..."
+          mkdir -p iOS_Build/Sources
+
+          # Copy all Swift files to build directory
+          cp -r Sources/SoundToLightTherapy iOS_Build/Sources/
+
+          # List all Swift files for compilation
+          echo "Swift files to compile:"
+          find iOS_Build/Sources -name "*.swift" -type f
+
+      - name: Build iOS App Bundle
+        run: |
+          echo "Building iOS app with proper SDK and frameworks..."
+
+          # Get iOS SDK path
+          IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          echo "Using iOS SDK: $IOS_SDK"
+
+          # Create app bundle directory
+          mkdir -p build/SoundToLightTherapyApp.app
+
+          # Compile all Swift files together for iOS
+          echo "Compiling Swift files for iOS ARM64..."
+
+          # Find all Swift source files
+          SWIFT_FILES=$(find iOS_Build/Sources -name "*.swift" -type f | tr '\n' ' ')
+          echo "Compiling files: $SWIFT_FILES"
+
+          # Compile with explicit framework paths
+          xcrun --sdk iphoneos swiftc \
+            -target arm64-apple-ios17.0 \
+            -sdk "$IOS_SDK" \
+            -O \
+            -enable-library-evolution \
+            -module-name SoundToLightTherapy \
+            -o build/SoundToLightTherapyApp.app/SoundToLightTherapyApp \
+            $SWIFT_FILES \
+            -framework SwiftUI \
+            -framework Foundation \
+            -framework AVFoundation \
+            -framework UIKit \
+            -framework Accelerate \
+            -Xlinker -rpath -Xlinker /System/Library/Frameworks \
+            -Xlinker -rpath -Xlinker @executable_path/Frameworks
+
+          echo "✅ iOS compilation completed successfully"
+
+          # Verify the binary
+          echo "Binary info:"
+          file build/SoundToLightTherapyApp.app/SoundToLightTherapyApp
+
+          echo "Binary size:"
+          ls -lh build/SoundToLightTherapyApp.app/SoundToLightTherapyApp
+
+      - name: Create App Bundle Resources
+        run: |
+          echo "Creating iOS app bundle with proper metadata..."
+
+          # Create Info.plist
+          cat > build/SoundToLightTherapyApp.app/Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDisplayName</key>
+              <string>Sound to Light Therapy</string>
+              <key>CFBundleExecutable</key>
+              <string>SoundToLightTherapyApp</string>
+              <key>CFBundleIdentifier</key>
+              <string>com.eggzy.soundtolighttherapy</string>
+              <key>CFBundleName</key>
+              <string>SoundToLightTherapyApp</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0</string>
+              <key>CFBundleVersion</key>
+              <string>3</string>
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+              <key>NSMicrophoneUsageDescription</key>
+              <string>This app uses the microphone to detect sound frequencies for therapeutic light synchronization.</string>
+              <key>UIViewControllerBasedStatusBarAppearance</key>
+              <false/>
+              <key>UISupportedInterfaceOrientations</key>
+              <array>
+                  <string>UIInterfaceOrientationPortrait</string>
+                  <string>UIInterfaceOrientationLandscapeLeft</string>
+                  <string>UIInterfaceOrientationLandscapeRight</string>
+              </array>
+              <key>UIRequiredDeviceCapabilities</key>
+              <array>
+                  <string>arm64</string>
+              </array>
+              <key>MinimumOSVersion</key>
+              <string>17.0</string>
+          </dict>
+          </plist>
+          EOF
+
+          # Make executable executable
+          chmod +x build/SoundToLightTherapyApp.app/SoundToLightTherapyApp
+
+          echo "✅ App bundle created successfully"
+          echo "App bundle contents:"
+          ls -la build/SoundToLightTherapyApp.app/
+
+      - name: Create IPA
+        run: |
+          echo "Creating final iOS IPA..."
+
+          mkdir -p build/Payload
+          cp -r build/SoundToLightTherapyApp.app build/Payload/
+
+          cd build
+          zip -r SoundToLightTherapyApp-Final.ipa Payload/
+          cd ..
+
+          echo "✅ Final iOS IPA created:"
+          ls -la build/*.ipa
+
+      - name: Upload Final iOS Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-final
+          path: |
+            build/*.ipa
+            build/SoundToLightTherapyApp.app/
+          retention-days: 7
