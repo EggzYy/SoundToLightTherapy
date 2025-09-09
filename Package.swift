@@ -28,7 +28,7 @@ let package = Package(
                 // Pure SwiftUI implementation - no external dependencies
             ],
             path: "Sources/SoundToLightTherapy",
-            exclude: ["main.swift"],
+            exclude: ["App.swift"],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
             ]
@@ -39,7 +39,7 @@ let package = Package(
                 .target(name: "SoundToLightTherapy")
             ],
             path: "Sources/SoundToLightTherapy",
-            sources: ["main.swift"]
+            sources: ["App.swift"]
         ),
         .testTarget(
             name: "SoundToLightTherapyTests",
