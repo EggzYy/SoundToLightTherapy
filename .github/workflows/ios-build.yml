@@ -2,21 +2,21 @@ name: iOS Build and Deploy
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [main, develop]
     tags:
-      - 'v*'
+      - "v*"
   pull_request:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
     inputs:
       build_type:
-        description: 'Build type'
+        description: "Build type"
         required: true
-        default: 'debug'
+        default: "debug"
         type: choice
         options:
-        - debug
-        - release
+          - debug
+          - release
 
 env:
   DEVELOPER_DIR: /Applications/Xcode.app/Contents/Developer
@@ -30,198 +30,197 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: latest-stable
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
 
-    - name: Show Xcode Version
-      run: |
-        xcode-select --print-path
-        xcodebuild -version
-        swift --version
+      - name: Show Xcode Version
+        run: |
+          xcode-select --print-path
+          xcodebuild -version
+          swift --version
 
-    - name: Cache Swift Package Manager
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/org.swift.swiftpm
-          .build
-        key: ${{ runner.os }}-spm-${{ hashFiles('SoundToLightTherapy/Package.resolved') }}
-        restore-keys: |
-          ${{ runner.os }}-spm-
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            .build
+          key: ${{ runner.os }}-spm-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-
 
-    - name: Generate Xcode Project
-      working-directory: SoundToLightTherapy
-      run: |
-        # Generate Xcode project from SwiftPM
-        swift package generate-xcodeproj --skip-extra-files
+      - name: Generate Xcode Project
+        run: |
+          # Generate Xcode project from SwiftPM
+          swift package generate-xcodeproj --skip-extra-files
 
-        # Alternative method using xcodegen if needed
-        # We'll use SwiftPM's native Xcode project generation
+          # Alternative method using xcodegen if needed
+          # We'll use SwiftPM's native Xcode project generation
 
-    - name: Create Info.plist
-      working-directory: SoundToLightTherapy
-      run: |
-        mkdir -p Resources/iOS
-        cat > Resources/iOS/Info.plist << 'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>CFBundleDevelopmentRegion</key>
-            <string>en</string>
-            <key>CFBundleDisplayName</key>
-            <string>Sound to Light Therapy</string>
-            <key>CFBundleExecutable</key>
-            <string>$(EXECUTABLE_NAME)</string>
-            <key>CFBundleIdentifier</key>
-            <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
-            <key>CFBundleInfoDictionaryVersion</key>
-            <string>6.0</string>
-            <key>CFBundleName</key>
-            <string>$(PRODUCT_NAME)</string>
-            <key>CFBundlePackageType</key>
-            <string>APPL</string>
-            <key>CFBundleShortVersionString</key>
-            <string>1.0.0</string>
-            <key>CFBundleVersion</key>
-            <string>1</string>
-            <key>LSRequiresIPhoneOS</key>
-            <true/>
-            <key>UILaunchStoryboardName</key>
-            <string>LaunchScreen</string>
-            <key>UIRequiredDeviceCapabilities</key>
-            <array>
-                <string>armv7</string>
-            </array>
-            <key>UISupportedInterfaceOrientations</key>
-            <array>
-                <string>UIInterfaceOrientationPortrait</string>
-                <string>UIInterfaceOrientationLandscapeLeft</string>
-                <string>UIInterfaceOrientationLandscapeRight</string>
-            </array>
-            <key>UISupportedInterfaceOrientations~ipad</key>
-            <array>
-                <string>UIInterfaceOrientationPortrait</string>
-                <string>UIInterfaceOrientationPortraitUpsideDown</string>
-                <string>UIInterfaceOrientationLandscapeLeft</string>
-                <string>UIInterfaceOrientationLandscapeRight</string>
-            </array>
-            <key>NSMicrophoneUsageDescription</key>
-            <string>This app uses the microphone to detect sound frequencies for therapeutic light synchronization.</string>
-            <key>UIViewControllerBasedStatusBarAppearance</key>
-            <false/>
-            <key>ITSAppUsesNonExemptEncryption</key>
-            <false/>
-        </dict>
-        </plist>
-        EOF
+      - name: Create Info.plist
 
-    - name: Create PrivacyInfo.xcprivacy
-      working-directory: SoundToLightTherapy
-      run: |
-        cat > Resources/iOS/PrivacyInfo.xcprivacy << 'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>NSPrivacyTracking</key>
-            <false/>
-            <key>NSPrivacyCollectedDataTypes</key>
-            <array/>
-            <key>NSPrivacyAccessedAPITypes</key>
-            <array>
-                <dict>
-                    <key>NSPrivacyAccessedAPIType</key>
-                    <string>NSPrivacyAccessedAPICategoryMicrophone</string>
-                    <key>NSPrivacyAccessedAPITypeReasons</key>
-                    <array>
-                        <string>3B52.1</string>
-                    </array>
-                </dict>
-            </array>
-        </dict>
-        </plist>
-        EOF
+        run: |
+          mkdir -p Resources/iOS
+          cat > Resources/iOS/Info.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>CFBundleDevelopmentRegion</key>
+              <string>en</string>
+              <key>CFBundleDisplayName</key>
+              <string>Sound to Light Therapy</string>
+              <key>CFBundleExecutable</key>
+              <string>$(EXECUTABLE_NAME)</string>
+              <key>CFBundleIdentifier</key>
+              <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+              <key>CFBundleInfoDictionaryVersion</key>
+              <string>6.0</string>
+              <key>CFBundleName</key>
+              <string>$(PRODUCT_NAME)</string>
+              <key>CFBundlePackageType</key>
+              <string>APPL</string>
+              <key>CFBundleShortVersionString</key>
+              <string>1.0.0</string>
+              <key>CFBundleVersion</key>
+              <string>1</string>
+              <key>LSRequiresIPhoneOS</key>
+              <true/>
+              <key>UILaunchStoryboardName</key>
+              <string>LaunchScreen</string>
+              <key>UIRequiredDeviceCapabilities</key>
+              <array>
+                  <string>armv7</string>
+              </array>
+              <key>UISupportedInterfaceOrientations</key>
+              <array>
+                  <string>UIInterfaceOrientationPortrait</string>
+                  <string>UIInterfaceOrientationLandscapeLeft</string>
+                  <string>UIInterfaceOrientationLandscapeRight</string>
+              </array>
+              <key>UISupportedInterfaceOrientations~ipad</key>
+              <array>
+                  <string>UIInterfaceOrientationPortrait</string>
+                  <string>UIInterfaceOrientationPortraitUpsideDown</string>
+                  <string>UIInterfaceOrientationLandscapeLeft</string>
+                  <string>UIInterfaceOrientationLandscapeRight</string>
+              </array>
+              <key>NSMicrophoneUsageDescription</key>
+              <string>This app uses the microphone to detect sound frequencies for therapeutic light synchronization.</string>
+              <key>UIViewControllerBasedStatusBarAppearance</key>
+              <false/>
+              <key>ITSAppUsesNonExemptEncryption</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
 
-    - name: Build for iOS Simulator (Debug)
-      if: github.event.inputs.build_type == 'debug' || github.event.inputs.build_type == ''
-      working-directory: SoundToLightTherapy
-      run: |
-        xcodebuild build \
-          -project SoundToLightTherapy.xcodeproj \
-          -scheme ${{ env.SCHEME_NAME }} \
-          -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=latest' \
-          -configuration Debug \
-          CODE_SIGNING_ALLOWED=NO \
-          ONLY_ACTIVE_ARCH=NO
+      - name: Create PrivacyInfo.xcprivacy
 
-    - name: Build for iOS Device (Release)
-      if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
-      working-directory: SoundToLightTherapy
-      run: |
-        xcodebuild build \
-          -project SoundToLightTherapy.xcodeproj \
-          -scheme ${{ env.SCHEME_NAME }} \
-          -destination 'generic/platform=iOS' \
-          -configuration Release \
-          CODE_SIGNING_ALLOWED=NO \
-          ONLY_ACTIVE_ARCH=NO
+        run: |
+          cat > Resources/iOS/PrivacyInfo.xcprivacy << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>NSPrivacyTracking</key>
+              <false/>
+              <key>NSPrivacyCollectedDataTypes</key>
+              <array/>
+              <key>NSPrivacyAccessedAPITypes</key>
+              <array>
+                  <dict>
+                      <key>NSPrivacyAccessedAPIType</key>
+                      <string>NSPrivacyAccessedAPICategoryMicrophone</string>
+                      <key>NSPrivacyAccessedAPITypeReasons</key>
+                      <array>
+                          <string>3B52.1</string>
+                      </array>
+                  </dict>
+              </array>
+          </dict>
+          </plist>
+          EOF
 
-    - name: Archive iOS App (Release)
-      if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
-      working-directory: SoundToLightTherapy
-      run: |
-        xcodebuild archive \
-          -project SoundToLightTherapy.xcodeproj \
-          -scheme ${{ env.SCHEME_NAME }} \
-          -destination 'generic/platform=iOS' \
-          -configuration Release \
-          -archivePath build/${{ env.PRODUCT_NAME }}.xcarchive \
-          CODE_SIGNING_ALLOWED=NO \
-          SKIP_INSTALL=NO
+      - name: Build for iOS Simulator (Debug)
+        if: github.event.inputs.build_type == 'debug' || github.event.inputs.build_type == ''
 
-    - name: Export IPA (Release)
-      if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
-      working-directory: SoundToLightTherapy
-      run: |
-        # Create export options plist
-        cat > ExportOptions.plist << 'EOF'
-        <?xml version="1.0" encoding="UTF-8"?>
-        <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-        <plist version="1.0">
-        <dict>
-            <key>method</key>
-            <string>development</string>
-            <key>uploadBitcode</key>
-            <false/>
-            <key>uploadSymbols</key>
-            <true/>
-            <key>compileBitcode</key>
-            <false/>
-        </dict>
-        </plist>
-        EOF
+        run: |
+          xcodebuild build \
+            -project SoundToLightTherapy.xcodeproj \
+            -scheme ${{ env.SCHEME_NAME }} \
+            -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=latest' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO
 
-        # Export archive to IPA
-        xcodebuild -exportArchive \
-          -archivePath build/${{ env.PRODUCT_NAME }}.xcarchive \
-          -exportPath build \
-          -exportOptionsPlist ExportOptions.plist
+      - name: Build for iOS Device (Release)
+        if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
 
-    - name: Upload Build Artifacts
-      if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
-      uses: actions/upload-artifact@v4
-      with:
-        name: ios-build-artifacts
-        path: |
-          SoundToLightTherapy/build/*.ipa
-          SoundToLightTherapy/build/${{ env.PRODUCT_NAME }}.xcarchive
-        retention-days: 30
+        run: |
+          xcodebuild build \
+            -project SoundToLightTherapy.xcodeproj \
+            -scheme ${{ env.SCHEME_NAME }} \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO
+
+      - name: Archive iOS App (Release)
+        if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
+
+        run: |
+          xcodebuild archive \
+            -project SoundToLightTherapy.xcodeproj \
+            -scheme ${{ env.SCHEME_NAME }} \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            -archivePath build/${{ env.PRODUCT_NAME }}.xcarchive \
+            CODE_SIGNING_ALLOWED=NO \
+            SKIP_INSTALL=NO
+
+      - name: Export IPA (Release)
+        if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
+
+        run: |
+          # Create export options plist
+          cat > ExportOptions.plist << 'EOF'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+              <key>method</key>
+              <string>development</string>
+              <key>uploadBitcode</key>
+              <false/>
+              <key>uploadSymbols</key>
+              <true/>
+              <key>compileBitcode</key>
+              <false/>
+          </dict>
+          </plist>
+          EOF
+
+          # Export archive to IPA
+          xcodebuild -exportArchive \
+            -archivePath build/${{ env.PRODUCT_NAME }}.xcarchive \
+            -exportPath build \
+            -exportOptionsPlist ExportOptions.plist
+
+      - name: Upload Build Artifacts
+        if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-build-artifacts
+          path: |
+            build/*.ipa
+            build/${{ env.PRODUCT_NAME }}.xcarchive
+          retention-days: 30
 
   # Test job for running unit tests
   test-ios:
@@ -229,36 +228,36 @@ jobs:
     runs-on: macos-latest
 
     steps:
-    - name: Checkout Repository
-      uses: actions/checkout@v4
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
-    - name: Setup Xcode
-      uses: maxim-lobanov/setup-xcode@v1
-      with:
-        xcode-version: latest-stable
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
 
-    - name: Cache Swift Package Manager
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.cache/org.swift.swiftpm
-          .build
-        key: ${{ runner.os }}-spm-test-${{ hashFiles('SoundToLightTherapy/Package.resolved') }}
-        restore-keys: |
-          ${{ runner.os }}-spm-test-
-          ${{ runner.os }}-spm-
+      - name: Cache Swift Package Manager
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/org.swift.swiftpm
+            .build
+          key: ${{ runner.os }}-spm-test-${{ hashFiles('Package.resolved') }}
+          restore-keys: |
+            ${{ runner.os }}-spm-test-
+            ${{ runner.os }}-spm-
 
-    - name: Run Tests
-      working-directory: SoundToLightTherapy
-      run: |
-        # First try SwiftPM tests
-        swift test --parallel
+      - name: Run Tests
 
-        # If we have an Xcode project, also run iOS-specific tests
-        if [ -f "SoundToLightTherapy.xcodeproj/project.pbxproj" ]; then
-          xcodebuild test \
-            -project SoundToLightTherapy.xcodeproj \
-            -scheme ${{ env.SCHEME_NAME }} \
-            -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=latest' \
-            -configuration Debug
-        fi
+        run: |
+          # First try SwiftPM tests
+          swift test --parallel
+
+          # If we have an Xcode project, also run iOS-specific tests
+          if [ -f "SoundToLightTherapy.xcodeproj/project.pbxproj" ]; then
+            xcodebuild test \
+              -project SoundToLightTherapy.xcodeproj \
+              -scheme ${{ env.SCHEME_NAME }} \
+              -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=latest' \
+              -configuration Debug
+          fi
