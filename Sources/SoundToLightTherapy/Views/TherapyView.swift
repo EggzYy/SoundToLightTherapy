@@ -45,11 +45,11 @@ public struct TherapyView: View {
     private var headerSection: some View {
         VStack {
             Text("Sound to Light Therapy")
-                .scalableFont(.title)
+                .font(.title)
             // TODO: Add accessibility traits when SwiftCrossUI supports them
 
             Text("Convert audio frequencies to light patterns")
-                .scalableFont(.subheadline)
+                .font(.subheadline)
                 .foregroundColor(Color(0.5, 0.5, 0.5, 1.0))
             // TODO: Add accessibility label when SwiftCrossUI supports them
         }
@@ -59,7 +59,7 @@ public struct TherapyView: View {
     private var frequencyControlSection: some View {
         VStack {
             Text("Target Frequency: \(String(format: "%.1f", targetFrequency)) Hz")
-                .scalableFont(.headline)
+                .font(.headline)
             // TODO: Add accessibility labels and traits when SwiftCrossUI supports them
 
             Slider($targetFrequency, minimum: 0.5, maximum: 40.0)
@@ -68,14 +68,14 @@ public struct TherapyView: View {
 
             HStack {
                 Text("0.5 Hz")
-                    .scalableFont(.caption)
+                    .font(.caption)
                     .foregroundColor(Color(0.5, 0.5, 0.5, 1.0))
                 // TODO: Add accessibility label when SwiftCrossUI supports them
 
                 Spacer()
 
                 Text("40 Hz")
-                    .scalableFont(.caption)
+                    .font(.caption)
                     .foregroundColor(Color(0.5, 0.5, 0.5, 1.0))
                 // TODO: Add accessibility label when SwiftCrossUI supports them
             }
@@ -109,16 +109,16 @@ public struct TherapyView: View {
     private var statusDisplaySection: some View {
         VStack(spacing: 10) {
             Text("Session Status: \(isSessionActive ? "Active" : "Inactive")")
-                .scalableFont(.headline)
+                .font(.headline)
                 .foregroundColor(isSessionActive ? .green : Color(0.5, 0.5, 0.5, 1.0))
             // TODO: Add accessibility labels and traits when SwiftCrossUI supports them
 
             Text("Current Frequency: \(String(format: "%.1f", currentFrequency)) Hz")
-                .scalableFont(.body)
+                .font(.body)
             // TODO: Add accessibility labels and traits when SwiftCrossUI supports them
 
             Text("Progress: \(Int(sessionProgress * 100))%")
-                .scalableFont(.body)
+                .font(.body)
             // TODO: Add accessibility labels and traits when SwiftCrossUI supports them
 
             ProgressView(value: sessionProgress)
@@ -143,7 +143,7 @@ public struct TherapyView: View {
     private var settingsSection: some View {
         VStack {
             Text("Session Duration: \(Int(sessionDuration)) seconds")
-                .scalableFont(.headline)
+                .font(.headline)
             // TODO: Add accessibility labels and traits when SwiftCrossUI supports them
 
             Slider($sessionDuration, minimum: 60.0, maximum: 600.0)
@@ -152,14 +152,14 @@ public struct TherapyView: View {
 
             HStack {
                 Text("60 sec")
-                    .scalableFont(.caption)
+                    .font(.caption)
                     .foregroundColor(Color(0.5, 0.5, 0.5, 1.0))
                 // TODO: Add accessibility label when SwiftCrossUI supports them
 
                 Spacer()
 
                 Text("600 sec")
-                    .scalableFont(.caption)
+                    .font(.caption)
                     .foregroundColor(Color(0.5, 0.5, 0.5, 1.0))
                 // TODO: Add accessibility label when SwiftCrossUI supports them
             }
