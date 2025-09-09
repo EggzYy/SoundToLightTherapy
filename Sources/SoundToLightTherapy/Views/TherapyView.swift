@@ -69,14 +69,14 @@ public struct TherapyView: SwiftUI.View {
             HStack {
                 Text("0.5 Hz")
                     .font(.caption)
-                    .foregroundColor(Color(0.5, 0.5, 0.5, 1.0))
+                    .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
                 // TODO: Add accessibility label when SwiftCrossUI supports them
 
                 Spacer()
 
                 Text("40 Hz")
                     .font(.caption)
-                    .foregroundColor(Color(0.5, 0.5, 0.5, 1.0))
+                    .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
                 // TODO: Add accessibility label when SwiftCrossUI supports them
             }
         }
