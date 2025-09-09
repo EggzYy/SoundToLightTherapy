@@ -50,7 +50,7 @@ public struct TherapyView: SwiftUI.View {
 
             Text("Convert audio frequencies to light patterns")
                 .font(.subheadline)
-                .foregroundColor(Color(0.5, 0.5, 0.5, 1.0))
+                .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
             // TODO: Add accessibility label when SwiftCrossUI supports them
         }
         // TODO: Add accessibility grouping when SwiftCrossUI supports them
@@ -62,7 +62,7 @@ public struct TherapyView: SwiftUI.View {
                 .font(.headline)
             // TODO: Add accessibility labels and traits when SwiftCrossUI supports them
 
-            Slider($targetFrequency, minimum: 0.5, maximum: 40.0)
+            Slider(value: $targetFrequency, in: 0.5...40.0)
                 // TODO: Add accessibility support for slider when SwiftCrossUI supports them
                 .withHapticFeedback(.selection, respectReducedMotion: true)
 
@@ -110,7 +110,7 @@ public struct TherapyView: SwiftUI.View {
         VStack(spacing: 10) {
             Text("Session Status: \(isSessionActive ? "Active" : "Inactive")")
                 .font(.headline)
-                .foregroundColor(isSessionActive ? .green : Color(0.5, 0.5, 0.5, 1.0))
+                .foregroundColor(isSessionActive ? .green : Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
             // TODO: Add accessibility labels and traits when SwiftCrossUI supports them
 
             Text("Current Frequency: \(String(format: "%.1f", currentFrequency)) Hz")
@@ -146,7 +146,7 @@ public struct TherapyView: SwiftUI.View {
                 .font(.headline)
             // TODO: Add accessibility labels and traits when SwiftCrossUI supports them
 
-            Slider($sessionDuration, minimum: 60.0, maximum: 600.0)
+            Slider(value: $sessionDuration, in: 60.0...600.0)
                 // TODO: Add accessibility support for slider when SwiftCrossUI supports them
                 .withHapticFeedback(.selection, respectReducedMotion: true)
 
@@ -215,10 +215,10 @@ public struct TherapyView: SwiftUI.View {
     // MARK: - Color Conversion Helper
     private func accessibleColorToColor(_ accessibleColor: AccessibleColor) -> Color {
         return Color(
-            Float(accessibleColor.red),
-            Float(accessibleColor.green),
-            Float(accessibleColor.blue),
-            Float(accessibleColor.alpha)
+            red: Double(accessibleColor.red),
+            green: Double(accessibleColor.green),
+            blue: Double(accessibleColor.blue),
+            opacity: Double(accessibleColor.alpha)
         )
     }
 }

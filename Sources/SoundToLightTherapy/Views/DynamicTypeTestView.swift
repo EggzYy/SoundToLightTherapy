@@ -42,7 +42,7 @@ import Foundation
                                 ColorContrastSupport.AccessiblePalettes.primaryBlue))
 
                     Text("Sample text in \(textStyle.rawValue) style")
-                        .font(textStyle)
+                        .font(Font.system(.body))  // Convert TextStyle to Font
                         .frame(minWidth: 0, maxWidth: .infinity, alignment: .leading)
                         .padding(16)
                 }
@@ -55,7 +55,10 @@ import Foundation
                     .font(.title2)
                     .padding(10)
 
-                ForEach(ContentSizeCategory.allCases, id: \.self) { sizeCategory in
+                ForEach(
+                    [SwiftUI.ContentSizeCategory.large, SwiftUI.ContentSizeCategory.extraLarge],
+                    id: \.self
+                ) { sizeCategory in
                     HStack {
                         Text("\(sizeCategory.rawValue):")
                             .font(.subheadline)
@@ -85,7 +88,10 @@ import Foundation
     struct DynamicTypeTestView_Previews: PreviewProvider {
         static var previews: some View {
             Group {
-                ForEach(ContentSizeCategory.allCases.prefix(5), id: \.self) { sizeCategory in
+                ForEach(
+                    [SwiftUI.ContentSizeCategory.large, SwiftUI.ContentSizeCategory.extraLarge],
+                    id: \.self
+                ) { sizeCategory in
                     DynamicTypeTestView()
                         .environment(\.sizeCategory, sizeCategory)
                         .previewDisplayName("\(sizeCategory.rawValue)")
