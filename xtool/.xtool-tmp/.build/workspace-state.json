@@ -1,0 +1,27 @@
+{
+  "object" : {
+    "artifacts" : [
+
+    ],
+    "dependencies" : [
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "soundtolighttherapy",
+          "kind" : "fileSystem",
+          "location" : "/home/eggzy/Downloads/phoneapp3/SoundToLightTherapy",
+          "name" : "SoundToLightTherapy"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/home/eggzy/Downloads/phoneapp3/SoundToLightTherapy"
+        },
+        "subpath" : "soundtolighttherapy"
+      }
+    ],
+    "prebuilts" : [
+
+    ]
+  },
+  "version" : 7
+}

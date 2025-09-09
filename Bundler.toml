@@ -1,0 +1,33 @@
+format_version = 2
+
+[apps.SoundToLightTherapy]
+identifier = 'com.yourcompany.soundtolighttherapy'
+product = 'SoundToLightTherapy'
+version = '1.0.0'
+
+[apps.SoundToLightTherapy.development]
+identifier = 'com.yourcompany.soundtolighttherapy.dev'
+product = 'SoundToLightTherapy-Dev'
+version = '1.0.0-dev'
+
+# iOS-specific configuration
+[platforms.iOS]
+deployment_target = '17.0'
+supported_device_families = ['iPhone', 'iPad']
+
+# Development signing configuration
+[platforms.iOS.development]
+code_signing_identity = 'iPhone Developer'
+provisioning_profile = '${PROVISIONING_PROFILE_PATH}'
+team_id = '${TEAM_ID}'
+
+# Required device capabilities for therapeutic app
+[platforms.iOS.device_capabilities]
+required = ['armv7', 'microphone']
+optional = ['flash', 'camera']
+
+# Privacy permissions for therapeutic functionality
+[platforms.iOS.permissions]
+microphone = "This therapeutic app uses the microphone to detect sound frequencies (20Hz-20kHz) for synchronized light therapy. Audio is processed locally and never transmitted or stored."
+camera = "Camera access is used to control the flashlight for therapeutic light synchronization based on detected audio frequencies."
+health_records = "Optional: Save therapy session summaries to Health app for wellness tracking."

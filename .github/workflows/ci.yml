@@ -1,0 +1,31 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-linux:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Install Swift
+      run: |
+        wget https://download.swift.org/swift-6.1-release/ubuntu2004/swift-6.1-RELEASE/swift-6.1-RELEASE-ubuntu20.04.tar.gz
+        tar xzf swift-6.1-RELEASE-ubuntu20.04.tar.gz
+        echo "$PWD/swift-6.1-RELEASE-ubuntu20.04/usr/bin" >> $GITHUB_PATH
+    - name: Run Tests
+      run: |
+        cd SoundToLightTherapy
+        swift test
+
+  test-macos:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v4
+    - name: Run Tests
+      run: |
+        cd SoundToLightTherapy
+        swift test
