@@ -11,6 +11,9 @@ public struct TherapyView: SwiftUI.View {
     @State private var sessionProgress: Double = 0.0
     @State private var lastAnnouncedProgress: Int = -1
 
+    // Shared session coordinator instance
+    private let sessionCoordinator = TherapySessionCoordinator()
+
     public init() {}
 
     public var body: some View {
@@ -170,22 +173,22 @@ public struct TherapyView: SwiftUI.View {
     // MARK: - Session Management
     private func startSession() async {
         do {
-            try await TherapySessionCoordinator().startSession()
+            try await sessionCoordinator.startSession()
             isSessionActive = true
-            await AccessibilityAnnouncer.shared.announceSessionStarted()
+            print("✅ Therapy session started successfully!")
             // Generate haptic feedback for session start
             _ = HapticFeedbackSupport.generate(.mediumImpact, respectReducedMotion: true)
         } catch {
-            print("Failed to start session: \(error)")
+            print("❌ Failed to start session: \(error)")
             // Generate error haptic feedback
             _ = HapticFeedbackSupport.generate(.error, respectReducedMotion: true)
         }
     }
 
     private func stopSession() async {
-        await TherapySessionCoordinator().stopSession()
+        await sessionCoordinator.stopSession()
         isSessionActive = false
-        await AccessibilityAnnouncer.shared.announceSessionStopped()
+        print("🛑 Therapy session stopped")
         // Generate haptic feedback for session stop
         _ = HapticFeedbackSupport.generate(.lightImpact, respectReducedMotion: true)
     }
