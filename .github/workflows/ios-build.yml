@@ -151,34 +151,47 @@ jobs:
       - name: Build for iOS Simulator (Debug)
         if: github.event.inputs.build_type == 'debug' || github.event.inputs.build_type == ''
         run: |
-          # Build with Swift Package Manager for iOS simulator
-          swift build \
-            --triple arm64-apple-ios17.0-simulator \
-            -c debug
+          # Use xcodebuild for iOS simulator
+          xcodebuild build \
+            -scheme ${{ env.SCHEME_NAME }} \
+            -destination 'platform=iOS Simulator,name=iPhone 15 Pro,OS=latest' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO
 
       - name: Build for iOS Device (Release)
         if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
         run: |
-          # Build with Swift Package Manager for iOS device
-          swift build \
-            --triple arm64-apple-ios17.0 \
-            -c release
+          # Use xcodebuild with Swift Package Manager
+          xcodebuild build \
+            -scheme ${{ env.SCHEME_NAME }} \
+            -destination 'generic/platform=iOS' \
+            -configuration Release \
+            CODE_SIGNING_ALLOWED=NO \
+            ONLY_ACTIVE_ARCH=NO
 
       - name: Create iOS App Bundle (Release)
         if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
         run: |
-          # Create app bundle structure
-          mkdir -p build/${{ env.PRODUCT_NAME }}.app
+          # Find the built app bundle from xcodebuild
+          # xcodebuild puts output in derived data, let's find it
+          DERIVED_DATA_PATH="$HOME/Library/Developer/Xcode/DerivedData"
+          APP_PATH=$(find "$DERIVED_DATA_PATH" -name "${{ env.PRODUCT_NAME }}.app" -path "*/Build/Products/Release-iphoneos/*" | head -1)
 
-          # Copy the built executable
-          cp .build/arm64-apple-ios17.0/release/SoundToLightTherapyApp build/${{ env.PRODUCT_NAME }}.app/${{ env.PRODUCT_NAME }}
+          if [ -z "$APP_PATH" ]; then
+            # Fallback: look in standard build locations
+            APP_PATH=$(find . -name "${{ env.PRODUCT_NAME }}.app" -path "*/Release-iphoneos/*" | head -1)
+          fi
 
-          # Copy iOS resources
-          cp Resources/iOS/Info.plist build/${{ env.PRODUCT_NAME }}.app/
-          cp Resources/iOS/PrivacyInfo.xcprivacy build/${{ env.PRODUCT_NAME }}.app/
-
-          # Make executable
-          chmod +x build/${{ env.PRODUCT_NAME }}.app/${{ env.PRODUCT_NAME }}
+          if [ -n "$APP_PATH" ]; then
+            # Create build directory and copy app bundle
+            mkdir -p build
+            cp -r "$APP_PATH" build/
+            echo "Found and copied app bundle: $APP_PATH"
+          else
+            echo "Could not find built app bundle"
+            exit 1
+          fi
 
       - name: Create IPA (Release)
         if: github.event.inputs.build_type == 'release' || startsWith(github.ref, 'refs/tags/')
