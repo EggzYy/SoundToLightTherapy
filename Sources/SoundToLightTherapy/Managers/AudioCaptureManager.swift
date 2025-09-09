@@ -102,14 +102,12 @@ public actor AudioCaptureManager {
         let inputNode = engine.inputNode
 
         let inputFormat = inputNode.outputFormat(forBus: 0)
-        guard inputFormat.sampleRate == sampleRate else {
-            #if canImport(OSLog)
-            logger.error("Sample rate mismatch: expected \(self.sampleRate), got \(inputFormat.sampleRate)")
-            #else
-            print("Error: Sample rate mismatch: expected \(self.sampleRate), got \(inputFormat.sampleRate)")
-            #endif
-            throw AudioCaptureError.audioEngineSetupFailed
-        }
+        // Log audio format info and accept device's native sample rate
+        #if canImport(OSLog)
+        logger.info("Audio format - Sample rate: \(inputFormat.sampleRate), Channels: \(inputFormat.channelCount)")
+        #else
+        print("✅ Audio format - Sample rate: \(inputFormat.sampleRate), Channels: \(inputFormat.channelCount)")
+        #endif
 
         inputNode.installTap(onBus: 0, bufferSize: AVAudioFrameCount(bufferSize), format: inputFormat) { [weak self] buffer, time in
             Task { [weak self] in
