@@ -154,10 +154,16 @@ jobs:
           # Skip simulator build - no iOS simulators available in GitHub Actions
           echo "Skipping iOS Simulator build - focusing on device build for deployment"
 
+      - name: Generate Xcode Project
+        run: |
+          # Generate Xcode project from Package.swift
+          swift package generate-xcodeproj
+
       - name: Build for iOS Device (Release)
         run: |
-          # Use xcodebuild with Swift Package Manager
+          # Use xcodebuild with generated Xcode project
           xcodebuild build \
+            -project SoundToLightTherapy.xcodeproj \
             -scheme ${{ env.SCHEME_NAME }} \
             -destination 'generic/platform=iOS' \
             -configuration Release \
