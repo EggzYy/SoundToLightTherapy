@@ -156,28 +156,36 @@ jobs:
 
       - name: Build for iOS Device (Release)
         run: |
-          # Build using Xcode's swift compiler with iOS SDK
-          DEVELOPER_DIR="/Applications/Xcode.app/Contents/Developer"
-          IOS_SDK_PATH="$DEVELOPER_DIR/Platforms/iPhoneOS.platform/Developer/SDKs/iPhoneOS.sdk"
+          # Build using Swift Package Manager for iOS
+          echo "Building iOS app with Swift Package Manager..."
 
-          # Build the executable directly with proper iOS settings
-          swiftc -target arm64-apple-ios17.0 \
-            -sdk "$IOS_SDK_PATH" \
-            -O \
-            -I Sources/SoundToLightTherapy \
-            -o SoundToLightTherapyApp \
-            Sources/SoundToLightTherapy/App.swift \
-            Sources/SoundToLightTherapy/**/*.swift \
-            -framework SwiftUI \
-            -framework Foundation \
-            -framework AVFAudio \
-            -framework UIKit
+          # Build the executable target for iOS
+          swift build --product SoundToLightTherapyApp \
+            -c release \
+            --arch arm64 \
+            -Xswiftc -target -Xswiftc arm64-apple-ios17.0 \
+            -Xswiftc -sdk -Xswiftc $(xcrun --sdk iphoneos --show-sdk-path)
+
+          echo "Build completed. Checking output:"
+          find .build -name "*SoundToLight*" -type f || true
 
       - name: Create iOS App Bundle
         run: |
           # Create iOS app bundle manually from Swift Package Manager build output
-          BUILD_DIR=".build/arm64-apple-ios17.0/release"
           EXECUTABLE_NAME="SoundToLightTherapyApp"
+
+          # Find the actual build directory created by Swift PM
+          BUILD_DIR=$(find .build -name "release" -type d | head -1)
+          if [ -z "$BUILD_DIR" ]; then
+            echo "No release build directory found, searching all build directories:"
+            find .build -type d -name "*release*" || true
+            find .build -type f -name "$EXECUTABLE_NAME" || true
+            BUILD_DIR=$(find .build -name "$EXECUTABLE_NAME" -type f | head -1 | xargs dirname)
+          fi
+
+          echo "Using build directory: $BUILD_DIR"
+          echo "Contents of build directory:"
+          ls -la "$BUILD_DIR" || true
 
           # Create app bundle directory structure
           mkdir -p build
@@ -185,14 +193,15 @@ jobs:
           mkdir -p "$APP_BUNDLE"
 
           # Copy executable to app bundle
-          if [ -f "$BUILD_DIR/$EXECUTABLE_NAME" ]; then
-            cp "$BUILD_DIR/$EXECUTABLE_NAME" "$APP_BUNDLE/"
-            echo "Copied executable: $BUILD_DIR/$EXECUTABLE_NAME -> $APP_BUNDLE/"
+          EXECUTABLE_PATH="$BUILD_DIR/$EXECUTABLE_NAME"
+          if [ -f "$EXECUTABLE_PATH" ]; then
+            cp "$EXECUTABLE_PATH" "$APP_BUNDLE/"
+            chmod +x "$APP_BUNDLE/$EXECUTABLE_NAME"
+            echo "Copied executable: $EXECUTABLE_PATH -> $APP_BUNDLE/"
           else
-            echo "Could not find built executable at $BUILD_DIR/$EXECUTABLE_NAME"
+            echo "Could not find built executable at $EXECUTABLE_PATH"
             echo "Searching for built files:"
             find .build -name "*SoundToLight*" -type f || true
-            ls -la .build/ || true
             exit 1
           fi
 
