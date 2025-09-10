@@ -96,9 +96,9 @@ public actor FrequencyDetector {
         var zeroCrossings = 0
         var previousSample: Float = 0
 
-        let stride = max(1, audioData.count / 1000) // Sample every nth element for performance
+        let stepSize = max(1, audioData.count / 1000) // Sample every nth element for performance
 
-        for i in stride(from: 0, to: audioData.count, by: stride) {
+        for i in stride(from: 0, to: audioData.count, by: stepSize) {
             let currentSample = audioData[i]
 
             // Count zero crossings (sign changes)
