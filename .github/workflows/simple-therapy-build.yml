@@ -1,0 +1,90 @@
+name: Simple Therapy Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Simple iOS App
+        run: |
+          echo "Building simple therapy app for iOS..."
+
+          IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          echo "Using iOS SDK: $IOS_SDK"
+
+          # Build single-file app
+          xcrun -sdk iphoneos swiftc \
+            -target arm64-apple-ios15.0 \
+            -sdk "$IOS_SDK" \
+            -O \
+            -o SimpleTherapyApp \
+            SimpleTherapyApp.swift \
+            -framework Foundation \
+            -framework UIKit \
+            -framework SwiftUI \
+            -framework AVFoundation \
+            -Xlinker -rpath -Xlinker @executable_path/Frameworks
+
+          echo "Build completed. Binary info:"
+          file SimpleTherapyApp
+
+          # Create app bundle
+          mkdir -p SimpleTherapyApp.app
+          cp SimpleTherapyApp SimpleTherapyApp.app/
+          chmod +x SimpleTherapyApp.app/SimpleTherapyApp
+
+          # Create Info.plist
+          cat > SimpleTherapyApp.app/Info.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>Simple Therapy</string>
+    <key>CFBundleExecutable</key>
+    <string>SimpleTherapyApp</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.eggzy.simpletherapy</string>
+    <key>CFBundleName</key>
+    <string>SimpleTherapy</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>This app uses the microphone to detect sound frequencies.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>This app uses the camera to control the flashlight.</string>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arm64</string>
+    </array>
+    <key>MinimumOSVersion</key>
+    <string>15.0</string>
+</dict>
+</plist>
+EOF
+
+          # Create IPA
+          mkdir -p Payload
+          cp -r SimpleTherapyApp.app Payload/
+          zip -r SimpleTherapyApp.ipa Payload/
+
+          echo "Created IPA:"
+          ls -la *.ipa
+
+      - name: Upload Simple App
+        uses: actions/upload-artifact@v4
+        with:
+          name: simple-therapy-app
+          path: |
+            SimpleTherapyApp.ipa
+            SimpleTherapyApp.app/

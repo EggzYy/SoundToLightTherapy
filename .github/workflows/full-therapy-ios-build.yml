@@ -1,0 +1,178 @@
+name: Full Therapy iOS Build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - 'Sources/**'
+
+jobs:
+  build-full-therapy:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
+      - name: Build Complete Therapeutic App for iOS Device
+        run: |
+          echo "🔨 Building COMPLETE Sound to Light Therapy app for iOS device..."
+
+          # Get iOS SDK
+          IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          echo "Using iOS SDK: $IOS_SDK"
+
+          # List all Swift files we're compiling
+          echo "Swift files in therapeutic app:"
+          find Sources -name "*.swift" -type f | sort
+
+          # Create output directory
+          mkdir -p build/therapy-ios
+
+          # Compile ALL therapeutic Swift files for iOS device using explicit iOS SDK
+          echo "🎯 Compiling complete therapeutic app for iOS ARM64..."
+
+          /usr/bin/xcrun -sdk iphoneos swiftc \
+            -target arm64-apple-ios17.0 \
+            -sdk "$IOS_SDK" \
+            -O \
+            -g \
+            -module-name SoundToLightTherapyApp \
+            -emit-executable \
+            -o build/therapy-ios/SoundToLightTherapyApp \
+            \
+            Sources/SoundToLightTherapyApp/main.swift \
+            \
+            Sources/SoundToLightTherapy/Views/TherapyView.swift \
+            Sources/SoundToLightTherapy/Views/DynamicTypeTestView.swift \
+            \
+            Sources/SoundToLightTherapy/Managers/AudioCaptureManager.swift \
+            Sources/SoundToLightTherapy/Managers/FlashlightController.swift \
+            Sources/SoundToLightTherapy/Managers/FrequencyDetector.swift \
+            Sources/SoundToLightTherapy/Managers/TherapySessionCoordinator.swift \
+            \
+            Sources/SoundToLightTherapy/Utilities/DynamicTypeSupport.swift \
+            Sources/SoundToLightTherapy/Utilities/HapticFeedbackSupport.swift \
+            Sources/SoundToLightTherapy/Utilities/VoiceOverSupport.swift \
+            Sources/SoundToLightTherapy/Utilities/ColorContrastSupport.swift \
+            Sources/SoundToLightTherapy/Utilities/ReducedMotionSupport.swift \
+            \
+            -framework Foundation \
+            -framework UIKit \
+            -framework SwiftUI \
+            -framework AVFoundation \
+            -framework Accelerate \
+            -Xlinker -rpath -Xlinker @executable_path/Frameworks \
+            -Xlinker -rpath -Xlinker /System/Library/Frameworks \
+            -Xlinker -iOS_version_min -Xlinker 17.0
+
+          echo "✅ Complete therapeutic iOS compilation finished"
+
+          # Verify binary is for iOS
+          echo "🔍 Binary verification:"
+          file build/therapy-ios/SoundToLightTherapyApp
+          ls -lah build/therapy-ios/SoundToLightTherapyApp
+
+      - name: Create Complete Therapy App Bundle
+        run: |
+          echo "📦 Creating complete therapeutic app bundle..."
+
+          # Create app bundle directory
+          APP_BUNDLE="build/SoundToLightTherapyApp.app"
+          mkdir -p "$APP_BUNDLE"
+
+          # Copy executable
+          cp build/therapy-ios/SoundToLightTherapyApp "$APP_BUNDLE/"
+          chmod +x "$APP_BUNDLE/SoundToLightTherapyApp"
+
+          # Create comprehensive Info.plist for therapeutic app
+          cat > "$APP_BUNDLE/Info.plist" << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>Sound to Light Therapy</string>
+    <key>CFBundleExecutable</key>
+    <string>SoundToLightTherapyApp</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.eggzy.soundtolighttherapy</string>
+    <key>CFBundleName</key>
+    <string>SoundToLightTherapyApp</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>7</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>This therapeutic app uses the microphone to detect sound frequencies and synchronize them with therapeutic light patterns for wellness sessions.</string>
+    <key>NSCameraUsageDescription</key>
+    <string>This therapeutic app uses the camera to control the flashlight for synchronized therapeutic light therapy sessions.</string>
+    <key>UIViewControllerBasedStatusBarAppearance</key>
+    <false/>
+    <key>UISupportedInterfaceOrientations</key>
+    <array>
+        <string>UIInterfaceOrientationPortrait</string>
+        <string>UIInterfaceOrientationLandscapeLeft</string>
+        <string>UIInterfaceOrientationLandscapeRight</string>
+    </array>
+    <key>UIRequiredDeviceCapabilities</key>
+    <array>
+        <string>arm64</string>
+        <string>microphone</string>
+        <string>camera-flash</string>
+    </array>
+    <key>MinimumOSVersion</key>
+    <string>17.0</string>
+    <key>UIApplicationSceneManifest</key>
+    <dict>
+        <key>UIApplicationSupportsMultipleScenes</key>
+        <true/>
+    </dict>
+</dict>
+</plist>
+EOF
+
+          echo "✅ Complete therapeutic app bundle created"
+          ls -la "$APP_BUNDLE/"
+
+      - name: Create Therapeutic IPA
+        run: |
+          echo "📱 Creating therapeutic iOS IPA..."
+
+          mkdir -p build/Payload
+          cp -r build/SoundToLightTherapyApp.app build/Payload/
+
+          cd build
+          zip -r SoundToLightTherapyApp-Complete-Therapeutic.ipa Payload/
+          cd ..
+
+          echo "✅ Complete therapeutic iOS IPA created:"
+          ls -la build/*.ipa
+
+          # Final verification
+          echo "🏥 COMPLETE THERAPEUTIC APP READY:"
+          echo "- Sound frequency detection (zero-crossing algorithm)"
+          echo "- Flashlight synchronization for light therapy"
+          echo "- Audio capture with permission handling"
+          echo "- Camera/flashlight control with permission handling"
+          echo "- SwiftUI therapeutic interface"
+          echo "- Session coordination and management"
+          echo "- Accessibility support utilities"
+          echo "- All compiled for iOS device ARM64"
+
+      - name: Upload Complete Therapeutic Build
+        uses: actions/upload-artifact@v4
+        with:
+          name: complete-therapeutic-ios-build
+          path: |
+            build/*.ipa
+            build/SoundToLightTherapyApp.app/
+          retention-days: 30
