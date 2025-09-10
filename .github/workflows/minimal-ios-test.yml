@@ -1,0 +1,164 @@
+name: Minimal iOS Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create Minimal iOS App
+        run: |
+          echo "Creating minimal iOS app to test compilation..."
+
+          # Create a minimal Swift app
+          mkdir -p minimal-app
+          cat > minimal-app/main.swift << 'EOF'
+import UIKit
+import SwiftUI
+
+@main
+struct MinimalApp: App {
+    var body: some Scene {
+        WindowGroup {
+            Text("Hello iOS!")
+                .padding()
+        }
+    }
+}
+EOF
+
+          # Get iOS SDK
+          IOS_SDK=$(xcrun --sdk iphoneos --show-sdk-path)
+          echo "iOS SDK: $IOS_SDK"
+
+          # Test different compilation approaches
+          echo "Testing iOS compilation approaches..."
+
+          # Method 1: Direct swiftc with iOS SDK
+          echo "Method 1: Direct swiftc"
+          xcrun -sdk iphoneos swiftc \
+            -target arm64-apple-ios17.0 \
+            -sdk "$IOS_SDK" \
+            -o minimal-app/MinimalApp-method1 \
+            minimal-app/main.swift \
+            -framework UIKit -framework SwiftUI -framework Foundation || echo "Method 1 failed"
+
+          # Method 2: Using xcodebuild with simple project
+          echo "Method 2: Creating Xcode project structure"
+          mkdir -p SimpleApp.xcodeproj
+          mkdir -p SimpleApp
+
+          # Create project.pbxproj
+          cat > SimpleApp.xcodeproj/project.pbxproj << 'PBXEOF'
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+		13B07F861A680F5B00A75B9A = {
+			isa = PBXGroup;
+			children = (
+				13B07F8E1A680F5B00A75B9A,
+			);
+			path = SimpleApp;
+			sourceTree = "<group>";
+		};
+		13B07F8E1A680F5B00A75B9A = {
+			isa = PBXFileReference;
+			fileEncoding = 4;
+			lastKnownFileType = sourcecode.swift;
+			path = main.swift;
+			sourceTree = "<group>";
+		};
+		13B07F941A680F5B00A75B9A = {
+			isa = PBXGroup;
+			children = (
+				13B07F961A680F5B00A75B9A,
+				13B07F861A680F5B00A75B9A,
+			);
+			sourceTree = "<group>";
+		};
+		13B07F961A680F5B00A75B9A = {
+			isa = PBXFileReference;
+			explicitFileType = wrapper.application;
+			includeInIndex = 0;
+			path = SimpleApp.app;
+			sourceTree = BUILT_PRODUCTS_DIR;
+		};
+		83CBBA001A601CBA00E9B192 = {
+			isa = PBXProject;
+			attributes = {
+				LastSwiftUpdateCheck = 1430;
+				LastUpgradeCheck = 1430;
+			};
+			buildConfigurationList = 83CBB9FA1A601CBA00E9B192;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				Base,
+			);
+			mainGroup = 83CBB9F61A601CBA00E9B192;
+			productRefGroup = 83CBBA001A601CBA00E9B192;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				13B07F861A680F5B00A75B9A,
+			);
+		};
+		13B07F861A680F5B00A75B9A = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 13B07F931A680F5B00A75B9A;
+			buildPhases = (
+				13B07F871A680F5B00A75B9A,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = SimpleApp;
+			productName = SimpleApp;
+			productReference = 13B07F961A680F5B00A75B9A;
+			productType = "com.apple.product-type.application";
+		};
+		13B07F871A680F5B00A75B9A = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				13B07F8F1A680F5B00A75B9A,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		13B07F8F1A680F5B00A75B9A = {
+			isa = PBXBuildFile;
+			fileRef = 13B07F8E1A680F5B00A75B9A;
+		};
+	};
+	rootObject = 83CBBA001A601CBA00E9B192;
+}
+PBXEOF
+
+          cp minimal-app/main.swift SimpleApp/
+
+          # Try building with xcodebuild
+          echo "Building with xcodebuild..."
+          xcodebuild -project SimpleApp.xcodeproj -scheme SimpleApp -destination 'generic/platform=iOS' || echo "xcodebuild failed"
+
+          # Show what we got
+          echo "Build results:"
+          find . -name "*.app" -o -name "MinimalApp*" | head -10
+          file minimal-app/MinimalApp-method1 2>/dev/null || echo "No method1 binary"
+
+      - name: Upload Test Results
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-compilation-test
+          path: |
+            minimal-app/
+            SimpleApp/
