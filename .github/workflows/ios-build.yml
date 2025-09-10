@@ -1,8 +1,9 @@
 name: iOS Build and Deploy
 
 on:
-  push:
-    branches: [main, develop]
+  # Temporarily disabled - using ios-build-device-fixed.yml instead
+  # push:
+  #   branches: [main, develop]
     tags:
       - "v*"
   pull_request:

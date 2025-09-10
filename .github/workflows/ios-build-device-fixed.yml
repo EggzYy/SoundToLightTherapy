@@ -1,4 +1,4 @@
-name: iOS Build Device Fixed
+name: iOS Device Build Fixed
 
 on:
   push:
