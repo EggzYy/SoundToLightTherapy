@@ -5,46 +5,39 @@ import PackageDescription
 let package = Package(
     name: "SoundToLightTherapy",
     platforms: [
-        .iOS(.v17),
-        .macOS(.v12),
+        .iOS(.v17)
     ],
     products: [
-        .library(
-            name: "SoundToLightTherapy",
-            targets: ["SoundToLightTherapy"]
-        ),
         .executable(
             name: "SoundToLightTherapyApp",
             targets: ["SoundToLightTherapyApp"]
-        ),
+        )
     ],
     dependencies: [
-        // Removed SwiftCrossUI dependency to fix macro plugin issues
+        // Pure SwiftUI implementation - no external dependencies
     ],
     targets: [
-        .target(
-            name: "SoundToLightTherapy",
-            dependencies: [
-                // Pure SwiftUI implementation - no external dependencies
+        .executableTarget(
+            name: "SoundToLightTherapyApp",
+            dependencies: [],
+            path: "Sources",
+            sources: [
+                "SoundToLightTherapyApp/main.swift",
+                "SoundToLightTherapy/Views/TherapyView.swift",
+                "SoundToLightTherapy/Views/DynamicTypeTestView.swift",
+                "SoundToLightTherapy/Managers/AudioCaptureManager.swift",
+                "SoundToLightTherapy/Managers/FlashlightController.swift",
+                "SoundToLightTherapy/Managers/FrequencyDetector.swift",
+                "SoundToLightTherapy/Managers/TherapySessionCoordinator.swift",
+                "SoundToLightTherapy/Utilities/DynamicTypeSupport.swift",
+                "SoundToLightTherapy/Utilities/HapticFeedbackSupport.swift",
+                "SoundToLightTherapy/Utilities/VoiceOverSupport.swift",
+                "SoundToLightTherapy/Utilities/ColorContrastSupport.swift",
+                "SoundToLightTherapy/Utilities/ReducedMotionSupport.swift",
             ],
-            path: "Sources/SoundToLightTherapy",
-            exclude: ["App.swift"],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
             ]
-        ),
-        .executableTarget(
-            name: "SoundToLightTherapyApp",
-            dependencies: [
-                .target(name: "SoundToLightTherapy")
-            ],
-            path: "Sources/SoundToLightTherapyApp",
-            sources: ["main.swift"]
-        ),
-        .testTarget(
-            name: "SoundToLightTherapyTests",
-            dependencies: ["SoundToLightTherapy"],
-            path: "Tests/SoundToLightTherapyTests"
-        ),
+        )
     ]
 )
