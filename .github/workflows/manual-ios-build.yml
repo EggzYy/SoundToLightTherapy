@@ -1,0 +1,146 @@
+name: Manual iOS Build
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Working iOS App
+        run: |
+          echo "Building working iOS therapeutic app..."
+
+          # Create single therapeutic app file
+          cat > SimpleTherapy.swift << 'EOF'
+import SwiftUI
+import AVFoundation
+
+@main
+struct SimpleTherapyApp: App {
+    var body: some Scene {
+        WindowGroup {
+            TherapyView()
+        }
+    }
+}
+
+struct TherapyView: View {
+    @State private var isActive = false
+    @State private var status = "Ready for Therapy"
+
+    var body: some View {
+        VStack(spacing: 20) {
+            Text("🔊💡 Sound Light Therapy")
+                .font(.title)
+
+            Text(status)
+                .font(.headline)
+
+            Button(isActive ? "Stop" : "Start") {
+                isActive.toggle()
+                status = isActive ? "Therapy Active" : "Therapy Stopped"
+                if isActive {
+                    requestPermissions()
+                    startTherapy()
+                }
+            }
+            .font(.title2)
+            .padding()
+            .background(isActive ? Color.red : Color.blue)
+            .foregroundColor(.white)
+            .cornerRadius(10)
+        }
+        .padding()
+    }
+
+    func requestPermissions() {
+        AVAudioSession.sharedInstance().requestRecordPermission { _ in }
+        AVCaptureDevice.requestAccess(for: .video) { _ in }
+    }
+
+    func startTherapy() {
+        guard let device = AVCaptureDevice.default(for: .video),
+              device.hasTorch else { return }
+
+        DispatchQueue.global().async {
+            while isActive {
+                try? device.lockForConfiguration()
+                try? device.setTorchModeOn(level: 1.0)
+                device.unlockForConfiguration()
+                Thread.sleep(forTimeInterval: 0.2)
+
+                try? device.lockForConfiguration()
+                device.torchMode = .off
+                device.unlockForConfiguration()
+                Thread.sleep(forTimeInterval: 0.8)
+            }
+        }
+    }
+}
+EOF
+
+          # Build for iOS
+          xcrun -sdk iphoneos swiftc \
+            -target arm64-apple-ios15.0 \
+            -sdk $(xcrun --sdk iphoneos --show-sdk-path) \
+            -O \
+            -o SimpleTherapyApp \
+            SimpleTherapy.swift \
+            -framework Foundation \
+            -framework SwiftUI \
+            -framework AVFoundation \
+            -framework UIKit
+
+          # Create app bundle
+          mkdir -p SimpleTherapyApp.app
+          cp SimpleTherapyApp SimpleTherapyApp.app/
+          chmod +x SimpleTherapyApp.app/SimpleTherapyApp
+
+          # Create Info.plist
+          cat > SimpleTherapyApp.app/Info.plist << 'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>Simple Therapy</string>
+    <key>CFBundleExecutable</key>
+    <string>SimpleTherapyApp</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.eggzy.simpletherapy</string>
+    <key>CFBundleName</key>
+    <string>SimpleTherapyApp</string>
+    <key>CFBundlePackageType</key>
+    <string>APPL</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0</string>
+    <key>CFBundleVersion</key>
+    <string>1</string>
+    <key>LSRequiresIPhoneOS</key>
+    <true/>
+    <key>NSMicrophoneUsageDescription</key>
+    <string>For therapeutic sound detection</string>
+    <key>NSCameraUsageDescription</key>
+    <string>For therapeutic light control</string>
+    <key>MinimumOSVersion</key>
+    <string>15.0</string>
+</dict>
+</plist>
+EOF
+
+          # Create IPA
+          mkdir -p Payload
+          cp -r SimpleTherapyApp.app Payload/
+          zip -r SimpleTherapyApp.ipa Payload/
+
+          echo "Build complete:"
+          file SimpleTherapyApp
+          ls -la *.ipa
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: working-therapy-app
+          path: SimpleTherapyApp.ipa
