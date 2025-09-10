@@ -38,8 +38,8 @@ let package = Package(
             dependencies: [
                 .target(name: "SoundToLightTherapy")
             ],
-            path: "Sources/SoundToLightTherapy",
-            sources: ["App.swift"]
+            path: "Sources/SoundToLightTherapyApp",
+            sources: ["main.swift"]
         ),
         .testTarget(
             name: "SoundToLightTherapyTests",
