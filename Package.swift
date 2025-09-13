@@ -8,33 +8,19 @@ let package = Package(
         .iOS(.v17)
     ],
     products: [
-        .executable(
-            name: "SoundToLightTherapyApp",
-            targets: ["SoundToLightTherapyApp"]
+        // Xtool project requires exactly one library product representing the main app
+        .library(
+            name: "SoundToLightTherapy",
+            targets: ["SoundToLightTherapy"]
         )
     ],
     dependencies: [
         // Pure SwiftUI implementation - no external dependencies
     ],
     targets: [
-        .executableTarget(
-            name: "SoundToLightTherapyApp",
+        .target(
+            name: "SoundToLightTherapy",
             dependencies: [],
-            path: "Sources",
-            sources: [
-                "SoundToLightTherapyApp/main.swift",
-                "SoundToLightTherapy/Views/TherapyView.swift",
-                "SoundToLightTherapy/Views/DynamicTypeTestView.swift",
-                "SoundToLightTherapy/Managers/AudioCaptureManager.swift",
-                "SoundToLightTherapy/Managers/FlashlightController.swift",
-                "SoundToLightTherapy/Managers/FrequencyDetector.swift",
-                "SoundToLightTherapy/Managers/TherapySessionCoordinator.swift",
-                "SoundToLightTherapy/Utilities/DynamicTypeSupport.swift",
-                "SoundToLightTherapy/Utilities/HapticFeedbackSupport.swift",
-                "SoundToLightTherapy/Utilities/VoiceOverSupport.swift",
-                "SoundToLightTherapy/Utilities/ColorContrastSupport.swift",
-                "SoundToLightTherapy/Utilities/ReducedMotionSupport.swift",
-            ],
             swiftSettings: [
                 .enableUpcomingFeature("StrictConcurrency")
             ]

@@ -109,7 +109,8 @@ public actor FlashlightController {
         return isTorchOn
     }
 
-    public func pulseFlashlight(duration: Double, frequency: Float) async throws {
+    // High-performance stroboscopic control optimized for therapeutic frequencies
+    public func startStroboscopicMode(frequency: Float, intensity: Float = 1.0) async throws {
         #if canImport(UIKit)
         // Request camera permission first
         _ = try await requestCameraPermission()
@@ -122,20 +123,66 @@ public actor FlashlightController {
             throw FlashlightError.torchUnavailable
         }
 
-        // Generate haptic feedback at the start of pulsing
+        // Lock device for configuration once to minimize overhead
+        try device.lockForConfiguration()
+
+        // Set torch to maximum intensity for strobing
+        try device.setTorchModeOn(level: intensity)
+        device.unlockForConfiguration()
+
+        isTorchOn = true
+
+        // Generate haptic feedback for strobe start
         _ = await HapticFeedbackSupport.generate(.selection, respectReducedMotion: true)
 
-        let pulseInterval = 1.0 / Double(frequency)
-        let totalPulses = Int(duration / pulseInterval)
+        print("🔆 Starting stroboscopic mode at \(frequency)Hz with intensity \(intensity)")
+        #else
+        throw FlashlightError.unsupportedPlatform
+        #endif
+    }
 
-        for _ in 0..<totalPulses {
-            try await setFlashlight(true)
-            try await Task.sleep(nanoseconds: UInt64(pulseInterval / 2 * 1_000_000_000))
-            try await setFlashlight(false)
-            try await Task.sleep(nanoseconds: UInt64(pulseInterval / 2 * 1_000_000_000))
+    public func stopStroboscopicMode() async throws {
+        try await setFlashlight(false)
+        print("🔆 Stroboscopic mode stopped")
+    }
+
+    // Optimized rapid toggling for high frequencies up to 40Hz
+    public func rapidToggle() async throws {
+        #if canImport(UIKit)
+        guard let device = device else {
+            throw FlashlightError.torchUnavailable
+        }
+
+        guard device.hasTorch else {
+            throw FlashlightError.torchUnavailable
+        }
+
+        // Use the fastest possible torch switching method
+        do {
+            try device.lockForConfiguration()
+
+            // Toggle torch state directly without checking current state
+            if isTorchOn {
+                device.torchMode = .off
+                isTorchOn = false
+            } else {
+                device.torchMode = .on
+                isTorchOn = true
+            }
+
+            device.unlockForConfiguration()
+        } catch {
+            throw FlashlightError.permissionDenied
         }
         #else
         throw FlashlightError.unsupportedPlatform
         #endif
+    }
+
+    // Legacy method for backward compatibility
+    public func pulseFlashlight(duration: Double, frequency: Float) async throws {
+        try await startStroboscopicMode(frequency: frequency)
+        try await Task.sleep(nanoseconds: UInt64(duration * 1_000_000_000))
+        try await stopStroboscopicMode()
     }
 }

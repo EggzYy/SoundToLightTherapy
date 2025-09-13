@@ -1,0 +1,27 @@
+{
+  "object" : {
+    "artifacts" : [
+
+    ],
+    "dependencies" : [
+      {
+        "basedOn" : null,
+        "packageRef" : {
+          "identity" : "xtool",
+          "kind" : "fileSystem",
+          "location" : "/home/eggzy/Downloads/phoneapp3/SoundToLightTherapy/xtool",
+          "name" : "xtool"
+        },
+        "state" : {
+          "name" : "fileSystem",
+          "path" : "/home/eggzy/Downloads/phoneapp3/SoundToLightTherapy/xtool"
+        },
+        "subpath" : "xtool"
+      }
+    ],
+    "prebuilts" : [
+
+    ]
+  },
+  "version" : 7
+}

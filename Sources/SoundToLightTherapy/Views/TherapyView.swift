@@ -10,9 +10,15 @@ public struct TherapyView: SwiftUI.View {
     @State private var currentFrequency: Float = 0.0
     @State private var sessionProgress: Double = 0.0
     @State private var lastAnnouncedProgress: Int = -1
+    @State private var isWakeLockActive: Bool = false
 
     // Shared session coordinator instance
     private let sessionCoordinator = TherapySessionCoordinator()
+
+    #if canImport(UIKit)
+    // Wake lock lifecycle manager for handling app lifecycle events
+    @StateObject private var wakeLockManager = WakeLockLifecycleManager()
+    #endif
 
     public init() {}
 
@@ -21,8 +27,8 @@ public struct TherapyView: SwiftUI.View {
             // Header section
             headerSection
 
-            // Frequency control section
-            frequencyControlSection
+            // Audio responsiveness display section
+            audioResponseSection
 
             // Session control section
             sessionControlSection
@@ -59,29 +65,55 @@ public struct TherapyView: SwiftUI.View {
         // TODO: Add accessibility grouping when SwiftCrossUI supports them
     }
 
-    private var frequencyControlSection: some View {
-        VStack {
-            Text("Target Frequency: \(String(format: "%.1f", targetFrequency)) Hz")
+    private var audioResponseSection: some View {
+        VStack(spacing: 15) {
+            Text("🎵 Audio-Responsive Light Therapy")
                 .font(.headline)
-            // TODO: Add accessibility labels and traits when SwiftCrossUI supports them
+                .foregroundColor(.blue)
 
-            Slider(value: $targetFrequency, in: 0.5...40.0)
-                // TODO: Add accessibility support for slider when SwiftCrossUI supports them
-                .withHapticFeedback(.selection, respectReducedMotion: true)
+            Text("Flashlight automatically syncs to detected audio frequencies")
+                .font(.subheadline)
+                .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                .multilineTextAlignment(.center)
 
-            HStack {
-                Text("0.5 Hz")
-                    .font(.caption)
-                    .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
-                // TODO: Add accessibility label when SwiftCrossUI supports them
+            // Real-time audio analysis display
+            VStack(spacing: 8) {
+                HStack {
+                    Text("Input Audio:")
+                        .font(.caption)
+                        .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                    Spacer()
+                    Text("\(String(format: "%.1f", currentFrequency)) Hz")
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.blue)
+                }
 
-                Spacer()
+                HStack {
+                    Text("Therapeutic Output:")
+                        .font(.caption)
+                        .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                    Spacer()
+                    Text("\(String(format: "%.1f", currentFrequency * 0.1)) Hz")  // Show mapped frequency
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.green)
+                }
 
-                Text("40 Hz")
-                    .font(.caption)
-                    .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
-                // TODO: Add accessibility label when SwiftCrossUI supports them
+                // Audio activity indicator
+                HStack {
+                    Text("Audio Activity:")
+                        .font(.caption)
+                        .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                    Spacer()
+                    Circle()
+                        .fill(currentFrequency > 10 ? Color.green : Color.gray)
+                        .frame(width: 12, height: 12)
+                        .scaleEffect(currentFrequency > 10 ? 1.2 : 1.0)
+                        .animation(.easeInOut(duration: 0.3), value: currentFrequency)
+                }
             }
+            .padding(.horizontal)
         }
         // TODO: Add accessibility grouping when SwiftCrossUI supports them
     }
@@ -126,6 +158,18 @@ public struct TherapyView: SwiftUI.View {
 
             ProgressView(value: sessionProgress)
             // TODO: Add accessibility support for progress view when SwiftCrossUI supports them
+
+            // Wake lock status indicator
+            HStack {
+                Text("Screen Lock:")
+                    .font(.caption)
+                    .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                Spacer()
+                Text(isWakeLockActive ? "🔓 Disabled" : "🔒 Enabled")
+                    .font(.caption)
+                    .fontWeight(.medium)
+                    .foregroundColor(isWakeLockActive ? .green : Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+            }
         }
         // TODO: Add accessibility grouping when SwiftCrossUI supports them
     }
@@ -173,8 +217,14 @@ public struct TherapyView: SwiftUI.View {
     // MARK: - Session Management
     private func startSession() async {
         do {
-            try await sessionCoordinator.startSession()
+            try await sessionCoordinator.startAudioResponsiveSession(duration: sessionDuration)
             isSessionActive = true
+
+            // Start updating UI with real-time data
+            Task {
+                await updateSessionDataLoop()
+            }
+
             print("✅ Therapy session started successfully!")
             // Generate haptic feedback for session start
             _ = HapticFeedbackSupport.generate(.mediumImpact, respectReducedMotion: true)
@@ -194,8 +244,12 @@ public struct TherapyView: SwiftUI.View {
     }
 
     private func emergencyStop() async {
-        await TherapySessionCoordinator().stopSession()
+        await sessionCoordinator.stopSession()
         isSessionActive = false
+
+        // Force disable wake lock for emergency stop
+        await ScreenWakeLock.shared.forceDisableWakeLock()
+
         await AccessibilityAnnouncer.shared.announceEmergencyStop()
         // Always generate strong haptic for emergency stop
         _ = HapticFeedbackSupport.generate(.heavyImpact, respectReducedMotion: false)
@@ -210,9 +264,27 @@ public struct TherapyView: SwiftUI.View {
         }
     }
 
+    private func updateSessionDataLoop() async {
+        while isSessionActive {
+            await updateSessionState()
+            try? await Task.sleep(nanoseconds: 250_000_000) // Update every 250ms
+        }
+    }
+
     private func updateSessionState() async {
-        _ = await TherapySessionCoordinator().getSessionState()
-        // In a real implementation, you'd update currentFrequency and sessionProgress from the coordinator
+        let activeState = await sessionCoordinator.getSessionState()
+        isSessionActive = activeState
+
+        if activeState {
+            currentFrequency = await sessionCoordinator.getCurrentFrequency()
+            sessionProgress = await sessionCoordinator.getSessionProgress()
+
+            // Announce progress if needed
+            await announceProgressIfNeeded(sessionProgress)
+        }
+
+        // Update wake lock status
+        isWakeLockActive = await ScreenWakeLock.shared.isActive()
     }
 
     // MARK: - Color Conversion Helper

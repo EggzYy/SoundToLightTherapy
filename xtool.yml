@@ -2,8 +2,9 @@ version: 1
 bundleID: com.eggzy.soundtolighttherapy
 teamID: D862N45GWD
 platform: iOS
-target: SoundToLightTherapyApp
+target: SoundToLightTherapy
 deploymentTarget: 17.0
+info: Info.plist
 capabilities:
   - microphone
   - camera
