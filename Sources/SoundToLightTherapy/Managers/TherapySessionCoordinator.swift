@@ -4,6 +4,7 @@ public actor TherapySessionCoordinator {
     private let audioCaptureManager = AudioCaptureManager()
     private let frequencyDetector = FrequencyDetector()
     private let flashlightController = FlashlightController()
+    private let precisionStrobeController = PrecisionStrobeController()
 
     private var isSessionActive: Bool = false
     private var audioStream: AsyncStream<[Float]>?
@@ -15,7 +16,30 @@ public actor TherapySessionCoordinator {
     private var currentFrequency: Float = 0.0
     private var sessionStartTime: Date?
 
-    public init() {}
+    public init() {
+        // Note: Hardware calibration will be performed when needed, not during init
+        // This prevents unwanted strobing during app startup
+    }
+    
+    /// Perform hardware calibration when explicitly requested or when starting a session
+    private func performInitialCalibrationIfNeeded() async {
+        do {
+            // Check if we have recent calibration data
+            let capabilities = try await precisionStrobeController.getHardwareCapabilities()
+            let timeSinceCalibration = Date().timeIntervalSince(capabilities.benchmarkDate)
+            
+            // If calibration is older than 24 hours, re-calibrate
+            if timeSinceCalibration > 86400 {
+                print("🔧 Performing background hardware calibration...")
+                _ = try await precisionStrobeController.performHardwareBenchmark()
+                print("✅ Background hardware calibration completed")
+            } else {
+                print("✅ Using existing calibration data (age: \(Int(timeSinceCalibration/3600))h)")
+            }
+        } catch {
+            print("⚠️ Calibration check failed: \(error)")
+        }
+    }
 
     public enum TherapySessionError: Error {
         case sessionAlreadyActive
@@ -38,6 +62,15 @@ public actor TherapySessionCoordinator {
         do {
             // Enable screen wake lock to prevent device from sleeping
             try await ScreenWakeLock.shared.enableWakeLock()
+
+            // Ensure flashlight starts in OFF state
+            try await flashlightController.setFlashlight(false)
+            print("🔦 Flashlight initialized to OFF state")
+
+            // Perform calibration check in background (non-blocking)
+            Task {
+                await performInitialCalibrationIfNeeded()
+            }
 
             // Start audio capture
             audioStream = try await audioCaptureManager.startCapture()
@@ -99,7 +132,16 @@ public actor TherapySessionCoordinator {
         await audioCaptureManager.stopCapture()
         audioStream = nil
 
-        // Turn off flashlight
+        // Stop precision strobing
+        if await precisionStrobeController.isCurrentlyStrobing() {
+            do {
+                try await precisionStrobeController.stopStrobing()
+            } catch {
+                print("Warning: Failed to stop precision strobing: \(error)")
+            }
+        }
+
+        // Turn off flashlight (fallback)
         do {
             try await flashlightController.setFlashlight(false)
         } catch {
@@ -116,7 +158,7 @@ public actor TherapySessionCoordinator {
         // Generate haptic feedback for session stop
         _ = await HapticFeedbackSupport.generate(.lightImpact, respectReducedMotion: true)
 
-        print("Therapy session stopped, wake lock disabled")
+        print("Therapy session stopped, precision strobing disabled, wake lock disabled")
     }
 
     // MARK: - Pure Audio-Responsive Processing
@@ -127,12 +169,11 @@ public actor TherapySessionCoordinator {
             return
         }
 
-        print("🎵 Starting pure audio-responsive mode - flashlight syncs directly to detected audio")
+        print("🎵 Starting pure audio-responsive mode with precision strobing")
 
-        var lastFlashlightToggle = Date()
-
-        // Start with flashlight off
-        try? await flashlightController.setFlashlight(false)
+        var currentStrobingFrequency: Float = 0.0
+        var consecutiveNoSignalCount = 0
+        let maxNoSignalCount = 30 // Stop strobing after 30 consecutive weak signals (increased for more stability)
 
         for await audioBuffer in audioStream {
             guard !Task.isCancelled else { break }
@@ -148,29 +189,90 @@ public actor TherapySessionCoordinator {
                 // Use the therapeutic frequency directly for flashlight control
                 let flashlightFreq = result.therapeuticFrequency
 
-                print("🔊 Audio: \(result.dominantFrequency)Hz → Flashlight: \(flashlightFreq)Hz")
+                // Enhanced logging with therapeutic information
+                if let mapping = result.therapeuticMapping {
+                    let noteInfo = "\(mapping.harmonicAnalysis.closestNote.rawValue)\(mapping.harmonicAnalysis.octave)"
+                    let therapyType = mapping.therapyType.rawValue
+                    let harmonicInfo = mapping.harmonicAnalysis.isHarmonic ? " 🎵" : ""
+                    
+                    print("🔊 \(result.dominantFrequency)Hz → \(flashlightFreq)Hz | \(noteInfo)\(harmonicInfo) | \(therapyType) | Conf: \(result.confidence)")
+                } else {
+                    print("🔊 Audio: \(result.dominantFrequency)Hz → Therapeutic: \(flashlightFreq)Hz (Confidence: \(result.confidence))")
+                }
 
-                // Calculate strobe interval based on detected therapeutic frequency
-                let strobeInterval = 1.0 / (Double(flashlightFreq) * 2.0)  // *2 for on/off cycle
+                // Reset no-signal counter on good signal (much lower threshold)
+                if result.confidence > 0.05 {
+                    consecutiveNoSignalCount = 0
+                }
 
-                let now = Date()
-                let timeSinceLastToggle = now.timeIntervalSince(lastFlashlightToggle)
-
-                if timeSinceLastToggle >= strobeInterval {
-                    // Rapid toggle for real-time audio response
-                    try await flashlightController.rapidToggle()
-                    lastFlashlightToggle = now
-
-                    print("💡 Flashlight toggled at \(flashlightFreq)Hz")
+                // Only update strobing if frequency changed significantly (>0.3 Hz difference) and confidence is good
+                if abs(flashlightFreq - currentStrobingFrequency) > 0.3 && result.confidence > 0.05 {
+                    currentStrobingFrequency = flashlightFreq
+                    
+                    // Stop current strobing
+                    if await precisionStrobeController.isCurrentlyStrobing() {
+                        try await precisionStrobeController.stopStrobing()
+                        // Small delay to ensure clean stop
+                        try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+                    }
+                    
+                    // Start precision strobing at the new frequency
+                    if flashlightFreq >= 1.0 {  // Minimum 1Hz for visible strobing
+                        try await precisionStrobeController.startStrobing(frequency: flashlightFreq, intensity: 1.0)
+                        print("🎯 Precision strobing started at \(flashlightFreq)Hz")
+                        
+                        // Verify actual strobing frequency after a brief moment
+                        try await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                        let actualFreq = await precisionStrobeController.getActualFrequency()
+                        print("✅ Actual strobing frequency: \(actualFreq)Hz (target: \(flashlightFreq)Hz)")
+                        
+                        if abs(actualFreq - flashlightFreq) > 1.0 {
+                            print("⚠️ Frequency mismatch detected! Target: \(flashlightFreq)Hz, Actual: \(actualFreq)Hz")
+                        }
+                    } else {
+                        print("⚠️ Frequency too low for strobing: \(flashlightFreq)Hz - keeping flashlight OFF")
+                        // Ensure flashlight is off for very low frequencies
+                        try? await flashlightController.setFlashlight(false)
+                    }
+                } else if result.confidence <= 0.05 {
+                    consecutiveNoSignalCount += 1
+                    print("⚠️ Very low confidence audio signal (\(result.confidence)) - count: \(consecutiveNoSignalCount)")
+                    
+                    // Stop strobing if we have too many consecutive weak signals
+                    if consecutiveNoSignalCount >= maxNoSignalCount {
+                        let isCurrentlyStrobing = await precisionStrobeController.isCurrentlyStrobing()
+                        if isCurrentlyStrobing {
+                            print("🔇 Stopping strobing due to weak audio signal")
+                            try? await precisionStrobeController.stopStrobing()
+                            currentStrobingFrequency = 0.0
+                            try? await flashlightController.setFlashlight(false)
+                        }
+                    }
                 }
 
             } catch FrequencyDetector.FrequencyDetectionError.frequencyOutOfRange {
-                print("⚠️ Audio frequency outside detectable range")
-                // Turn off flashlight when no valid audio detected
+                print("⚠️ Audio frequency outside detectable range - ensuring flashlight OFF")
+                // Stop strobing when no valid audio detected
+                if await precisionStrobeController.isCurrentlyStrobing() {
+                    try? await precisionStrobeController.stopStrobing()
+                    currentStrobingFrequency = 0.0
+                }
+                // Ensure flashlight is off when no valid audio
                 try? await flashlightController.setFlashlight(false)
+                
+                // Reset current frequency to indicate no valid input
+                currentFrequency = 0.0
             } catch {
-                print("Error in audio processing: \(error)")
-                // Continue processing, don't stop session
+                print("Error in audio processing: \(error) - ensuring flashlight OFF")
+                // Stop strobing on any error and turn off flashlight
+                if await precisionStrobeController.isCurrentlyStrobing() {
+                    try? await precisionStrobeController.stopStrobing()
+                    currentStrobingFrequency = 0.0
+                }
+                try? await flashlightController.setFlashlight(false)
+                
+                // Reset current frequency to indicate error state
+                currentFrequency = 0.0
             }
 
             // Check if session duration has been reached
@@ -182,9 +284,11 @@ public actor TherapySessionCoordinator {
             }
         }
 
-        // Ensure flashlight is off when processing ends
-        try? await flashlightController.setFlashlight(false)
-        print("🔆 Audio-responsive mode completed")
+        // Ensure strobing is stopped when processing ends
+        if await precisionStrobeController.isCurrentlyStrobing() {
+            try? await precisionStrobeController.stopStrobing()
+        }
+        print("🔆 Precision audio-responsive mode completed")
     }
 
     private func processAudioAndControlFlashlight() async {
@@ -193,42 +297,38 @@ public actor TherapySessionCoordinator {
             return
         }
 
-        print("🎵 Starting audio processing loop - target frequency: \(targetFrequency)Hz")
+        print("🎵 Starting precision strobing at target frequency: \(targetFrequency)Hz")
 
-        var flashlightState = false
-        var lastFlashlightToggle = Date()
-
-        // Calculate target interval between flashlight toggles (in seconds)
-        let targetInterval = 1.0 / (Double(targetFrequency) * 2.0) // *2 because on+off = 1 cycle
+        // Start precision strobing at the target frequency immediately
+        do {
+            try await precisionStrobeController.startStrobing(frequency: targetFrequency, intensity: 1.0)
+            print("🎯 Precision strobing started at \(targetFrequency)Hz")
+        } catch {
+            print("❌ Failed to start precision strobing: \(error)")
+            // Fall back to old method if precision strobing fails
+            return await processAudioAndControlFlashlightFallback()
+        }
 
         for await audioBuffer in audioStream {
             guard !Task.isCancelled else { break }
             guard isSessionActive else { break }
 
             do {
-                // Detect current frequency from audio
+                // Detect current frequency from audio for monitoring
                 let detectedFrequency = try await frequencyDetector.detectFrequency(from: audioBuffer)
                 currentFrequency = detectedFrequency
 
-                print("🔊 Detected: \(detectedFrequency)Hz, Target: \(targetFrequency)Hz")
+                print("🔊 Detected: \(detectedFrequency)Hz, Strobing: \(targetFrequency)Hz")
 
-                // Use target frequency for therapeutic effect (not detected frequency)
-                // This provides consistent therapy regardless of ambient sound
-                let now = Date()
-                let timeSinceLastToggle = now.timeIntervalSince(lastFlashlightToggle)
-
-                if timeSinceLastToggle >= targetInterval {
-                    // Toggle flashlight at target frequency
-                    flashlightState.toggle()
-                    try await flashlightController.setFlashlight(flashlightState)
-                    lastFlashlightToggle = now
-
-                    print("💡 Flashlight: \(flashlightState ? "ON" : "OFF") at \(targetFrequency)Hz")
+                // Get real-time accuracy metrics
+                let metrics = await precisionStrobeController.getTimingAccuracy()
+                if metrics.accuracyPercentage < 90.0 {
+                    print("⚠️ Strobing accuracy: \(metrics.accuracyPercentage)%")
                 }
 
             } catch FrequencyDetector.FrequencyDetectionError.frequencyOutOfRange {
                 // Frequency is outside therapeutic range, continue with target frequency
-                print("⚠️ Detected frequency outside range, using target frequency")
+                print("⚠️ Detected frequency outside range, continuing with target frequency")
             } catch {
                 print("Error in frequency detection: \(error)")
                 // Continue with target frequency even if detection fails
@@ -238,6 +338,44 @@ public actor TherapySessionCoordinator {
             if let startTime = sessionStartTime,
                Date().timeIntervalSince(startTime) >= sessionDuration {
                 print("⏰ Session duration reached, stopping session")
+                await stopSession()
+                break
+            }
+        }
+    }
+    
+    // Fallback method using old flashlight controller
+    private func processAudioAndControlFlashlightFallback() async {
+        guard let audioStream = audioStream else { return }
+        
+        print("🔄 Using fallback flashlight control method")
+        
+        var flashlightState = false
+        var lastFlashlightToggle = Date()
+        let targetInterval = 1.0 / (Double(targetFrequency) * 2.0)
+
+        for await audioBuffer in audioStream {
+            guard !Task.isCancelled else { break }
+            guard isSessionActive else { break }
+
+            do {
+                let detectedFrequency = try await frequencyDetector.detectFrequency(from: audioBuffer)
+                currentFrequency = detectedFrequency
+
+                let now = Date()
+                let timeSinceLastToggle = now.timeIntervalSince(lastFlashlightToggle)
+
+                if timeSinceLastToggle >= targetInterval {
+                    flashlightState.toggle()
+                    try await flashlightController.setFlashlight(flashlightState)
+                    lastFlashlightToggle = now
+                }
+            } catch {
+                print("Error in fallback processing: \(error)")
+            }
+
+            if let startTime = sessionStartTime,
+               Date().timeIntervalSince(startTime) >= sessionDuration {
                 await stopSession()
                 break
             }
@@ -260,6 +398,58 @@ public actor TherapySessionCoordinator {
 
     public func getTargetFrequency() async -> Float {
         return targetFrequency
+    }
+    
+    /// Get real-time precision strobing metrics
+    public func getStrobingAccuracy() async -> PrecisionStrobeController.StrobeAccuracyMetrics? {
+        if await precisionStrobeController.isCurrentlyStrobing() {
+            return await precisionStrobeController.getTimingAccuracy()
+        }
+        return nil
+    }
+    
+    /// Get actual achieved strobing frequency
+    public func getActualStrobingFrequency() async -> Float {
+        return await precisionStrobeController.getActualFrequency()
+    }
+    
+    /// Manually trigger hardware calibration
+    public func performHardwareCalibration() async throws {
+        print("🔧 Starting manual hardware calibration...")
+        _ = try await precisionStrobeController.performHardwareBenchmark()
+        print("✅ Manual hardware calibration completed")
+    }
+    
+    /// Get hardware capabilities
+    public func getHardwareCapabilities() async throws -> HardwareCapabilityDetector.HardwareCapabilities {
+        return try await precisionStrobeController.getHardwareCapabilities()
+    }
+    
+    // MARK: - Therapeutic Analysis
+    
+    /// Get therapeutic recommendations for a specific frequency
+    public func getTherapeuticRecommendations(for frequency: Float, confidence: Float = 1.0) async -> TherapeuticFrequencyMapper.TherapeuticMapping {
+        return await frequencyDetector.getTherapeuticRecommendations(for: frequency, confidence: confidence)
+    }
+    
+    /// Get all available therapy types with their frequency ranges
+    public func getAvailableTherapyTypes() async -> [(TherapeuticFrequencyMapper.TherapyType, ClosedRange<Float>)] {
+        return await frequencyDetector.getAvailableTherapyTypes()
+    }
+    
+    /// Check if a frequency is within the therapeutic range
+    public func isTherapeuticFrequency(_ frequency: Float) async -> Bool {
+        return await frequencyDetector.isTherapeuticFrequency(frequency)
+    }
+    
+    /// Set therapy type override for manual therapy type selection
+    public func setTherapyTypeOverride(_ therapyType: TherapeuticFrequencyMapper.TherapyType?) async {
+        await frequencyDetector.setTherapyTypeOverride(therapyType)
+    }
+    
+    /// Get current therapy type override
+    public func getCurrentTherapyTypeOverride() async -> TherapeuticFrequencyMapper.TherapyType? {
+        return await frequencyDetector.getCurrentTherapyTypeOverride()
     }
 
 }

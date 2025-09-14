@@ -11,6 +11,19 @@ public struct TherapyView: SwiftUI.View {
     @State private var sessionProgress: Double = 0.0
     @State private var lastAnnouncedProgress: Int = -1
     @State private var isWakeLockActive: Bool = false
+    
+    // Enhanced therapeutic information
+    @State private var therapeuticFrequency: Float = 0.0
+    @State private var musicalNote: String = ""
+    @State private var therapyType: String = ""
+    @State private var isHarmonic: Bool = false
+    @State private var confidence: Float = 0.0
+    @State private var therapeuticRecommendations: [String] = []
+    
+    // Therapy type selection and override
+    @State private var selectedTherapyType: TherapeuticFrequencyMapper.TherapyType? = nil
+    @State private var isTherapyTypeOverrideEnabled: Bool = false
+    @State private var showTherapyTypeSelector: Bool = false
 
     // Shared session coordinator instance
     private let sessionCoordinator = TherapySessionCoordinator()
@@ -35,6 +48,14 @@ public struct TherapyView: SwiftUI.View {
 
             // Status display section
             statusDisplaySection
+
+            // Therapy type selection section
+            therapyTypeSelectionSection
+            
+            // Therapeutic recommendations section
+            if isSessionActive {
+                therapeuticRecommendationsSection
+            }
 
             // Emergency stop section
             emergencyStopSection
@@ -76,41 +97,78 @@ public struct TherapyView: SwiftUI.View {
                 .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
                 .multilineTextAlignment(.center)
 
-            // Real-time audio analysis display
+            // Enhanced real-time audio analysis display
             VStack(spacing: 8) {
+                // Input frequency with musical note
                 HStack {
                     Text("Input Audio:")
                         .font(.caption)
                         .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
                     Spacer()
-                    Text("\(String(format: "%.1f", currentFrequency)) Hz")
-                        .font(.caption)
-                        .fontWeight(.bold)
-                        .foregroundColor(.blue)
+                    HStack(spacing: 4) {
+                        Text("\(String(format: "%.1f", currentFrequency)) Hz")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(.blue)
+                        
+                        if !musicalNote.isEmpty {
+                            Text("(\(musicalNote))")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.purple)
+                        }
+                        
+                        if isHarmonic {
+                            Text("🎵")
+                                .font(.caption)
+                        }
+                    }
                 }
 
+                // Therapeutic output frequency
                 HStack {
                     Text("Therapeutic Output:")
                         .font(.caption)
                         .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
                     Spacer()
-                    Text("\(String(format: "%.1f", currentFrequency * 0.1)) Hz")  // Show mapped frequency
+                    Text("\(String(format: "%.1f", therapeuticFrequency)) Hz")
                         .font(.caption)
                         .fontWeight(.bold)
                         .foregroundColor(.green)
                 }
+                
+                // Therapy type
+                if !therapyType.isEmpty {
+                    HStack {
+                        Text("Therapy Type:")
+                            .font(.caption)
+                            .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                        Spacer()
+                        Text(therapyType)
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(therapyTypeColor(therapyType))
+                    }
+                }
 
-                // Audio activity indicator
+                // Audio activity indicator with confidence
                 HStack {
-                    Text("Audio Activity:")
+                    Text("Signal Quality:")
                         .font(.caption)
                         .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
                     Spacer()
-                    Circle()
-                        .fill(currentFrequency > 10 ? Color.green : Color.gray)
-                        .frame(width: 12, height: 12)
-                        .scaleEffect(currentFrequency > 10 ? 1.2 : 1.0)
-                        .animation(.easeInOut(duration: 0.3), value: currentFrequency)
+                    HStack(spacing: 4) {
+                        Circle()
+                            .fill(confidenceColor(confidence))
+                            .frame(width: 12, height: 12)
+                            .scaleEffect(confidence > 0.3 ? 1.2 : 1.0)
+                            .animation(.easeInOut(duration: 0.3), value: confidence)
+                        
+                        Text("\(Int(confidence * 100))%")
+                            .font(.caption)
+                            .fontWeight(.medium)
+                            .foregroundColor(confidenceColor(confidence))
+                    }
                 }
             }
             .padding(.horizontal)
@@ -171,6 +229,165 @@ public struct TherapyView: SwiftUI.View {
                     .foregroundColor(isWakeLockActive ? .green : Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
             }
         }
+        // TODO: Add accessibility grouping when SwiftCrossUI supports them
+    }
+    
+    private var therapyTypeSelectionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("🎯 Therapy Type Control")
+                    .font(.headline)
+                    .foregroundColor(.purple)
+                
+                Spacer()
+                
+                Button(action: {
+                    showTherapyTypeSelector.toggle()
+                }) {
+                    Text(showTherapyTypeSelector ? "Hide" : "Select")
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.purple.opacity(0.2))
+                        .cornerRadius(8)
+                }
+            }
+            
+            if showTherapyTypeSelector {
+                VStack(spacing: 8) {
+                    // Override toggle
+                    HStack {
+                        Text("Manual Override:")
+                            .font(.caption)
+                            .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            isTherapyTypeOverrideEnabled.toggle()
+                            Task {
+                                if isTherapyTypeOverrideEnabled {
+                                    await sessionCoordinator.setTherapyTypeOverride(selectedTherapyType)
+                                } else {
+                                    await sessionCoordinator.setTherapyTypeOverride(nil)
+                                }
+                            }
+                        }) {
+                            Text(isTherapyTypeOverrideEnabled ? "ON" : "OFF")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(isTherapyTypeOverrideEnabled ? .white : .gray)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(isTherapyTypeOverrideEnabled ? Color.green : Color.gray.opacity(0.3))
+                                .cornerRadius(6)
+                        }
+                    }
+                    
+                    // Therapy type buttons
+                    if isTherapyTypeOverrideEnabled {
+                        therapyTypeButtonsGrid
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(hue: 0.8, saturation: 0.1, brightness: 0.95, opacity: 1.0))
+        .cornerRadius(8)
+        // TODO: Add accessibility grouping when SwiftCrossUI supports them
+    }
+    
+    private var therapyTypeButtonsGrid: some View {
+        VStack(spacing: 8) {
+            Text("Select Therapy Type:")
+                .font(.caption)
+                .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+            
+            // First row: Delta, Theta, Alpha
+            HStack(spacing: 8) {
+                therapyTypeButton(.delta)
+                therapyTypeButton(.theta)
+                therapyTypeButton(.alpha)
+            }
+            
+            // Second row: Beta, Gamma
+            HStack(spacing: 8) {
+                therapyTypeButton(.beta)
+                therapyTypeButton(.gamma)
+                Spacer() // Balance the row
+            }
+        }
+    }
+    
+    private func therapyTypeButton(_ type: TherapeuticFrequencyMapper.TherapyType) -> some View {
+        Button(action: {
+            selectedTherapyType = type
+            Task {
+                await sessionCoordinator.setTherapyTypeOverride(type)
+            }
+        }) {
+            VStack(spacing: 4) {
+                Text(type.rawValue)
+                    .font(.caption)
+                    .fontWeight(.bold)
+                    .foregroundColor(selectedTherapyType == type ? .white : therapyTypeColor(type.rawValue))
+                
+                Text("\(String(format: "%.1f", type.frequencyRange.lowerBound))-\(String(format: "%.0f", type.frequencyRange.upperBound))Hz")
+                    .font(.system(size: 10))
+                    .foregroundColor(selectedTherapyType == type ? .white.opacity(0.8) : Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+            }
+            .padding(.horizontal, 8)
+            .padding(.vertical, 6)
+            .background(
+                selectedTherapyType == type 
+                    ? therapyTypeColor(type.rawValue)
+                    : therapyTypeColor(type.rawValue).opacity(0.2)
+            )
+            .cornerRadius(8)
+        }
+    }
+    
+    private var therapeuticRecommendationsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("🧠 Therapeutic Analysis")
+                .font(.headline)
+                .foregroundColor(.purple)
+            
+            ScrollView {
+                VStack(alignment: .leading, spacing: 4) {
+                    if therapeuticRecommendations.isEmpty {
+                        HStack(alignment: .top, spacing: 8) {
+                            Text("•")
+                                .foregroundColor(.purple)
+                                .fontWeight(.bold)
+                            Text("Analyzing audio signal...")
+                                .font(.caption)
+                                .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                                .multilineTextAlignment(.leading)
+                            Spacer()
+                        }
+                    } else {
+                        ForEach(Array(therapeuticRecommendations.prefix(3).enumerated()), id: \.offset) { index, recommendation in
+                            HStack(alignment: .top, spacing: 8) {
+                                Text("•")
+                                    .foregroundColor(.purple)
+                                    .fontWeight(.bold)
+                                Text(recommendation)
+                                    .font(.caption)
+                                    .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                                    .multilineTextAlignment(.leading)
+                                Spacer()
+                            }
+                        }
+                    }
+                }
+                .padding(.horizontal, 8)
+            }
+            .frame(maxHeight: 80)
+        }
+        .padding()
+        .background(Color(hue: 0.8, saturation: 0.1, brightness: 0.95, opacity: 1.0))
+        .cornerRadius(8)
         // TODO: Add accessibility grouping when SwiftCrossUI supports them
     }
 
@@ -278,6 +495,28 @@ public struct TherapyView: SwiftUI.View {
         if activeState {
             currentFrequency = await sessionCoordinator.getCurrentFrequency()
             sessionProgress = await sessionCoordinator.getSessionProgress()
+            
+            // Get enhanced therapeutic information
+            if currentFrequency > 0 {
+                let therapeuticMapping = await sessionCoordinator.getTherapeuticRecommendations(
+                    for: currentFrequency, 
+                    confidence: 1.0
+                )
+                
+                therapeuticFrequency = therapeuticMapping.therapeuticFrequency
+                musicalNote = "\(therapeuticMapping.harmonicAnalysis.closestNote.rawValue)\(therapeuticMapping.harmonicAnalysis.octave)"
+                therapyType = therapeuticMapping.therapyType.rawValue
+                isHarmonic = therapeuticMapping.harmonicAnalysis.isHarmonic
+                confidence = therapeuticMapping.mappingConfidence
+                therapeuticRecommendations = therapeuticMapping.recommendations
+            }
+            
+            // Sync therapy type override state
+            let currentOverride = await sessionCoordinator.getCurrentTherapyTypeOverride()
+            if currentOverride != selectedTherapyType {
+                selectedTherapyType = currentOverride
+            }
+            isTherapyTypeOverrideEnabled = (currentOverride != nil)
 
             // Announce progress if needed
             await announceProgressIfNeeded(sessionProgress)
@@ -287,7 +526,7 @@ public struct TherapyView: SwiftUI.View {
         isWakeLockActive = await ScreenWakeLock.shared.isActive()
     }
 
-    // MARK: - Color Conversion Helper
+    // MARK: - Color Helpers
     private func accessibleColorToColor(_ accessibleColor: AccessibleColor) -> Color {
         return Color(
             red: Double(accessibleColor.red),
@@ -295,5 +534,34 @@ public struct TherapyView: SwiftUI.View {
             blue: Double(accessibleColor.blue),
             opacity: Double(accessibleColor.alpha)
         )
+    }
+    
+    private func therapyTypeColor(_ therapyType: String) -> Color {
+        switch therapyType {
+        case "Delta":
+            return Color.purple  // Deep sleep, healing
+        case "Theta":
+            return Color.blue    // Meditation, creativity
+        case "Alpha":
+            return Color.green   // Relaxation, learning
+        case "Beta":
+            return Color.orange  // Active thinking
+        case "Gamma":
+            return Color.red     // High-level cognition
+        default:
+            return Color.gray
+        }
+    }
+    
+    private func confidenceColor(_ confidence: Float) -> Color {
+        if confidence > 0.7 {
+            return Color.green      // High confidence
+        } else if confidence > 0.4 {
+            return Color.orange     // Medium confidence
+        } else if confidence > 0.1 {
+            return Color.yellow     // Low confidence
+        } else {
+            return Color.gray       // Very low confidence
+        }
     }
 }
