@@ -33,6 +33,14 @@ public struct TherapyView: SwiftUI.View {
     @State private var isPatternAudioResponsive: Bool = false
     @State private var sessionStartTime: Date? = nil
     @State private var isSessionPaused: Bool = false
+    
+    // Audio processing settings
+    @State private var showingAudioSettings: Bool = false
+    @State private var noiseFloorCalibrationEnabled: Bool = true
+    @State private var ambientSoundFilteringEnabled: Bool = true
+    @State private var adaptiveThresholdEnabled: Bool = true
+    @State private var environmentalSensitivity: Float = 1.0
+    @State private var currentNoiseFloor: Float = 0.0
 
     // Shared session coordinator instance
     private let sessionCoordinator = TherapySessionCoordinator()
@@ -73,6 +81,9 @@ public struct TherapyView: SwiftUI.View {
                 // Emergency stop section
                 emergencyStopSection
 
+                // Audio processing settings section
+                audioProcessingSettingsSection
+                
                 // Settings section
                 settingsSection
             }
@@ -403,6 +414,188 @@ public struct TherapyView: SwiftUI.View {
         } else {
             return Color.green
         }
+    }
+    
+    private var audioProcessingSettingsSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("🎛️ Audio Processing Settings")
+                    .font(.headline)
+                    .foregroundColor(.cyan)
+                
+                Spacer()
+                
+                Button(action: {
+                    showingAudioSettings.toggle()
+                }) {
+                    Text(showingAudioSettings ? "Hide" : "Show")
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.cyan.opacity(0.2))
+                        .cornerRadius(8)
+                }
+            }
+            
+            if showingAudioSettings {
+                VStack(spacing: 12) {
+                    // Noise Floor Calibration
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Noise Floor Calibration")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            
+                            Text("Automatically detect background noise level")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            noiseFloorCalibrationEnabled.toggle()
+                            print("🎛️ UI: Noise Floor Calibration toggled to \(noiseFloorCalibrationEnabled)")
+                            Task {
+                                await sessionCoordinator.setNoiseFloorCalibration(enabled: noiseFloorCalibrationEnabled)
+                            }
+                        }) {
+                            Text(noiseFloorCalibrationEnabled ? "ON" : "OFF")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(noiseFloorCalibrationEnabled ? .white : .gray)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(noiseFloorCalibrationEnabled ? Color.green : Color.gray.opacity(0.3))
+                                .cornerRadius(6)
+                        }
+                    }
+                    
+                    // Ambient Sound Filtering
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Ambient Sound Filtering")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            
+                            Text("Filter out background noise and low-confidence signals")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            ambientSoundFilteringEnabled.toggle()
+                            Task {
+                                await sessionCoordinator.setAmbientSoundFiltering(enabled: ambientSoundFilteringEnabled)
+                            }
+                        }) {
+                            Text(ambientSoundFilteringEnabled ? "ON" : "OFF")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(ambientSoundFilteringEnabled ? .white : .gray)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(ambientSoundFilteringEnabled ? Color.green : Color.gray.opacity(0.3))
+                                .cornerRadius(6)
+                        }
+                    }
+                    
+                    // Adaptive Threshold
+                    HStack {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("Adaptive Threshold")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            
+                            Text("Automatically adjust sensitivity based on environment")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                        }
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            adaptiveThresholdEnabled.toggle()
+                            Task {
+                                await sessionCoordinator.setAdaptiveThreshold(enabled: adaptiveThresholdEnabled)
+                            }
+                        }) {
+                            Text(adaptiveThresholdEnabled ? "ON" : "OFF")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(adaptiveThresholdEnabled ? .white : .gray)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(adaptiveThresholdEnabled ? Color.green : Color.gray.opacity(0.3))
+                                .cornerRadius(6)
+                        }
+                    }
+                    
+                    // Environmental Sensitivity
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Text("Environmental Sensitivity: \(String(format: "%.1f", environmentalSensitivity))x")
+                                .font(.caption)
+                                .fontWeight(.medium)
+                            
+                            Spacer()
+                            
+                            Button("Calibrate Noise Floor") {
+                                Task {
+                                    print("🔧 UI: Calibrate Noise Floor button pressed")
+                                    await sessionCoordinator.calibrateNoiseFloor()
+                                }
+                            }
+                            .font(.caption)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 4)
+                            .background(Color.cyan.opacity(0.2))
+                            .cornerRadius(4)
+                        }
+                        
+                        Slider(value: $environmentalSensitivity, in: 0.5...2.0, step: 0.1)
+                            .onChange(of: environmentalSensitivity) {
+                                print("🎛️ UI: Environmental Sensitivity changed to \(environmentalSensitivity)")
+                                Task {
+                                    await sessionCoordinator.setEnvironmentalSensitivity(environmentalSensitivity)
+                                }
+                            }
+                        
+                        HStack {
+                            Text("Less Sensitive")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                            Spacer()
+                            Text("More Sensitive")
+                                .font(.system(size: 10))
+                                .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                        }
+                    }
+                    
+                    // Current Noise Floor Display
+                    if currentNoiseFloor > 0 {
+                        HStack {
+                            Text("Current Noise Floor:")
+                                .font(.caption)
+                                .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                            
+                            Spacer()
+                            
+                            Text(String(format: "%.3f", currentNoiseFloor))
+                                .font(.caption)
+                                .fontWeight(.medium)
+                                .foregroundColor(.cyan)
+                        }
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(hue: 0.5, saturation: 0.1, brightness: 0.95, opacity: 1.0))
+        .cornerRadius(8)
+        // TODO: Add accessibility grouping when SwiftCrossUI supports them
     }
     
     private var sessionPatternSelectionSection: some View {
@@ -965,6 +1158,16 @@ public struct TherapyView: SwiftUI.View {
 
         // Update wake lock status
         isWakeLockActive = await ScreenWakeLock.shared.isActive()
+        
+        // Update audio processing settings (only when not in active session to avoid UI flicker)
+        if !isSessionActive {
+            let noiseFloorSettings = await sessionCoordinator.getNoiseFloorSettings()
+            noiseFloorCalibrationEnabled = noiseFloorSettings.calibrationEnabled
+            ambientSoundFilteringEnabled = noiseFloorSettings.filteringEnabled
+            adaptiveThresholdEnabled = noiseFloorSettings.adaptiveThresholdEnabled
+            environmentalSensitivity = noiseFloorSettings.environmentalSensitivity
+            currentNoiseFloor = noiseFloorSettings.currentNoiseFloor
+        }
     }
 
     // MARK: - Color Helpers

@@ -95,8 +95,8 @@
   - Add session pause/resume with pattern state preservation
   - _Requirements: 8.1, 8.2, 10.1_
 
-- [ ] 2.3 Add noise floor detection and ambient sound filtering
-  - Implement automatic noise floor calibration
+- [x] 2.3 Add noise floor detection and ambient sound filtering (selectable by user)
+  - Implement automatic noise floor calibration (selectable by user)
   - Create ambient sound filtering to ignore background noise (selectable by user)
   - Add confidence scoring for frequency detection reliability
   - Implement adaptive threshold adjustment based on environment
@@ -113,7 +113,6 @@
 - [ ] 3. Implement safety monitoring and photosensitivity protection
   - Create SafetyMonitor actor with real-time frequency validation
   - Add epilepsy-risk frequency detection (15-25 Hz warning system)
-  - Implement session duration limits with automatic break prompts
   - Create user safety acknowledgment system with medical disclaimers
   - _Requirements: 5.1, 5.2, 5.3, 5.4_
 
@@ -121,27 +120,27 @@
   - Implement SafetyMonitor actor with continuous frequency monitoring
   - Create SafetyValidation struct with warnings and recommendations
   - Add real-time safety checks during active strobing sessions
-  - Implement safety override mechanisms for dangerous frequencies
+  - Implement safety override mechanisms for dangerous frequencies (open close by user selection)
   - _Requirements: 5.1, 5.2_
 
 - [ ] 3.2 Implement epilepsy-risk frequency detection and warnings
   - Create specific monitoring for 15-25 Hz frequency range
   - Add immediate warning display when epilepsy-risk frequencies detected
-  - Implement automatic frequency adjustment or session pause for safety
+  - Implement automatic frequency adjustment or session pause for safety (open close by user selection)
   - Create user override option with additional safety confirmations
   - _Requirements: 5.2_
 
 - [ ] 3.3 Add session duration monitoring with break prompts
   - Implement automatic session duration tracking
   - Add configurable session limits based on safety mode settings
-  - Implement forced session termination for extended use
+  - Implement forced session termination for extended use (configurable by user)
   - _Requirements: 5.3_
 
 - [ ] 3.4 Create safety acknowledgment system with medical disclaimers
   - Implement first-launch safety warning with required acknowledgment
   - Create medical disclaimer screens with photosensitivity warnings
-  - Add safety mode toggle with frequency limitations (max 20 Hz)
-  - Implement session-specific safety confirmations for high-risk frequencies
+  - Add safety mode toggle with frequency limitations (max 20 Hz) (selectable by user)
+  - Implement session-specific safety confirmations for high-risk frequencies (in the settings part only not in every session)
   - _Requirements: 5.1, 5.4_
 
 - [ ] 4. Create calibration engine for timing validation and correction

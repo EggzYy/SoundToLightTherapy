@@ -844,6 +844,38 @@ public actor TherapySessionCoordinator {
         return await frequencyDetector.getCurrentTherapyTypeOverride()
     }
     
+    // MARK: - Audio Processing Configuration
+    
+    /// Configure noise floor calibration
+    public func setNoiseFloorCalibration(enabled: Bool) async {
+        await frequencyDetector.setNoiseFloorCalibration(enabled: enabled)
+    }
+    
+    /// Configure ambient sound filtering
+    public func setAmbientSoundFiltering(enabled: Bool) async {
+        await frequencyDetector.setAmbientSoundFiltering(enabled: enabled)
+    }
+    
+    /// Configure adaptive threshold adjustment
+    public func setAdaptiveThreshold(enabled: Bool) async {
+        await frequencyDetector.setAdaptiveThreshold(enabled: enabled)
+    }
+    
+    /// Set environmental sensitivity
+    public func setEnvironmentalSensitivity(_ sensitivity: Float) async {
+        await frequencyDetector.setEnvironmentalSensitivity(sensitivity)
+    }
+    
+    /// Get current noise floor settings
+    public func getNoiseFloorSettings() async -> FrequencyDetector.NoiseFloorSettings {
+        return await frequencyDetector.getNoiseFloorSettings()
+    }
+    
+    /// Manually calibrate noise floor
+    public func calibrateNoiseFloor() async {
+        await frequencyDetector.calibrateNoiseFloor()
+    }
+    
     // MARK: - Pattern Session Information
     
     /// Get the current session pattern if running a pattern-based session

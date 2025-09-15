@@ -23,11 +23,17 @@ public actor FrequencyDetector {
     private var spectralPeaks: [SpectralPeak] = []
     private var smoothedSpectrum: [Float] = []
     
-    // Noise floor detection and filtering
+    // Noise floor detection and filtering (user-configurable)
     private var noiseFloor: Float = 0.0
     private var noiseFloorHistory: [Float] = []
     private var silenceCounter: Int = 0
     private let maxSilenceFrames: Int = 5
+    
+    // User-configurable settings
+    private var isNoiseFloorCalibrationEnabled: Bool = true
+    private var isAmbientSoundFilteringEnabled: Bool = true
+    private var adaptiveThresholdEnabled: Bool = true
+    private var environmentalSensitivity: Float = 1.0 // 0.5 = less sensitive, 2.0 = more sensitive
     
     // Advanced windowing
     private var hanningWindow: [Float] = []
@@ -158,8 +164,8 @@ public actor FrequencyDetector {
             silenceCounter += 1
             print("🔇 Very low signal detected (RMS: \(rmsLevel)) - silence count: \(silenceCounter)")
             
-            if silenceCounter >= maxSilenceFrames {
-                // Return low confidence result for sustained silence
+            if silenceCounter >= maxSilenceFrames && isAmbientSoundFilteringEnabled {
+                // Return low confidence result for sustained silence (if filtering enabled)
                 throw FrequencyDetectionError.belowNoiseFloor
             }
         } else {
@@ -169,8 +175,10 @@ public actor FrequencyDetector {
         // Perform comprehensive frequency analysis
         let analysis = try performAdvancedFrequencyAnalysis(audioData)
         
-        // Update noise floor estimation
-        updateNoiseFloor(analysis.spectrum)
+        // Update noise floor estimation (if enabled)
+        if isNoiseFloorCalibrationEnabled {
+            updateNoiseFloor(analysis.spectrum)
+        }
         
         // Filter out high-frequency noise (above 8000 Hz is likely electrical noise)
         let maxValidFrequency: Float = 8000.0
@@ -182,9 +190,10 @@ public actor FrequencyDetector {
             filteredAnalysis = findValidFrequencyPeak(analysis, maxFrequency: maxValidFrequency)
         }
         
-        // Additional confidence check against noise floor - made even more lenient
-        if filteredAnalysis.confidence < 0.05 { // Lowered from 0.15 to 0.05
-            print("⚠️ Very low confidence signal: \(filteredAnalysis.confidence)")
+        // Additional confidence check against noise floor - adjustable based on environmental sensitivity
+        let confidenceThreshold = adaptiveThresholdEnabled ? (0.05 / environmentalSensitivity) : 0.05
+        if filteredAnalysis.confidence < confidenceThreshold && isAmbientSoundFilteringEnabled {
+            print("⚠️ Very low confidence signal: \(filteredAnalysis.confidence) (threshold: \(confidenceThreshold))")
             throw FrequencyDetectionError.lowConfidence
         }
 
@@ -776,5 +785,100 @@ public actor FrequencyDetector {
     /// Get current therapy type override
     public func getCurrentTherapyTypeOverride() async -> TherapeuticFrequencyMapper.TherapyType? {
         return currentTherapyTypeOverride
+    }
+    
+    // MARK: - Noise Floor and Filtering Configuration
+    
+    /// Enable or disable automatic noise floor calibration
+    public func setNoiseFloorCalibration(enabled: Bool) async {
+        print("🎛️ FrequencyDetector: setNoiseFloorCalibration called with enabled=\(enabled)")
+        isNoiseFloorCalibrationEnabled = enabled
+        if enabled {
+            print("✅ Noise floor calibration enabled")
+        } else {
+            print("🔇 Noise floor calibration disabled")
+            // Reset noise floor when disabled
+            noiseFloor = 0.0
+            noiseFloorHistory.removeAll()
+        }
+    }
+    
+    /// Enable or disable ambient sound filtering
+    public func setAmbientSoundFiltering(enabled: Bool) async {
+        isAmbientSoundFilteringEnabled = enabled
+        if enabled {
+            print("✅ Ambient sound filtering enabled")
+        } else {
+            print("🔇 Ambient sound filtering disabled")
+        }
+    }
+    
+    /// Enable or disable adaptive threshold adjustment
+    public func setAdaptiveThreshold(enabled: Bool) async {
+        adaptiveThresholdEnabled = enabled
+        if enabled {
+            print("✅ Adaptive threshold adjustment enabled")
+        } else {
+            print("🔇 Adaptive threshold adjustment disabled")
+        }
+    }
+    
+    /// Set environmental sensitivity (0.5 = less sensitive, 2.0 = more sensitive)
+    public func setEnvironmentalSensitivity(_ sensitivity: Float) async {
+        environmentalSensitivity = max(0.1, min(3.0, sensitivity))
+        print("🎛️ Environmental sensitivity set to \(environmentalSensitivity)")
+    }
+    
+    /// Get current noise floor detection settings
+    public func getNoiseFloorSettings() async -> NoiseFloorSettings {
+        return NoiseFloorSettings(
+            calibrationEnabled: isNoiseFloorCalibrationEnabled,
+            filteringEnabled: isAmbientSoundFilteringEnabled,
+            adaptiveThresholdEnabled: adaptiveThresholdEnabled,
+            environmentalSensitivity: environmentalSensitivity,
+            currentNoiseFloor: noiseFloor,
+            noiseFloorHistory: noiseFloorHistory
+        )
+    }
+    
+    /// Manually trigger noise floor calibration
+    public func calibrateNoiseFloor() async {
+        print("🔧 FrequencyDetector: calibrateNoiseFloor called")
+        guard isNoiseFloorCalibrationEnabled else {
+            print("⚠️ Noise floor calibration is disabled")
+            return
+        }
+        
+        print("🔧 Starting manual noise floor calibration...")
+        noiseFloor = 0.0
+        noiseFloorHistory.removeAll()
+        silenceCounter = 0
+        print("✅ Noise floor calibration reset - will recalibrate on next audio input")
+    }
+    
+    /// Noise floor settings structure
+    public struct NoiseFloorSettings: Sendable {
+        public let calibrationEnabled: Bool
+        public let filteringEnabled: Bool
+        public let adaptiveThresholdEnabled: Bool
+        public let environmentalSensitivity: Float
+        public let currentNoiseFloor: Float
+        public let noiseFloorHistory: [Float]
+        
+        public init(
+            calibrationEnabled: Bool,
+            filteringEnabled: Bool,
+            adaptiveThresholdEnabled: Bool,
+            environmentalSensitivity: Float,
+            currentNoiseFloor: Float,
+            noiseFloorHistory: [Float]
+        ) {
+            self.calibrationEnabled = calibrationEnabled
+            self.filteringEnabled = filteringEnabled
+            self.adaptiveThresholdEnabled = adaptiveThresholdEnabled
+            self.environmentalSensitivity = environmentalSensitivity
+            self.currentNoiseFloor = currentNoiseFloor
+            self.noiseFloorHistory = noiseFloorHistory
+        }
     }
 }
