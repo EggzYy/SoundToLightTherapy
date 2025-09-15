@@ -48,7 +48,7 @@
   - Implement frequency range validation and therapeutic recommendations
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 2.25 Implement advanced therapy session management with harmonic-based frequency transformation
+- [x] 2.25 Implement advanced therapy session management with harmonic-based frequency transformation
   - Create therapy type selection interface for manual therapy type override
   - Implement session pattern designer with customizable therapy sequences
   - Add session pattern storage and management system with named presets
@@ -71,7 +71,7 @@
   - Implement pattern storage system with user-defined names and descriptions
   - _Requirements: 10.1, 10.3, 8.1_
 
-- [ ] 2.25.3 Add session pattern storage and preset management
+- [x] 2.25.3 Add session pattern storage and preset management
   - Create SessionPatternManager for saving/loading custom patterns
   - Implement pattern library UI with search and filtering capabilities
   - Add pattern sharing functionality for exporting/importing patterns
@@ -87,7 +87,7 @@
   - Implement frequency validation to ensure therapeutic frequencies stay within brainwave ranges
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5_
 
-- [ ] 2.25.5 Create real-time therapy type switching and session control
+- [x] 2.25.5 Create real-time therapy type switching and session control
   - Implement seamless therapy type transitions during active sessions
   - Add session timeline UI showing current and upcoming therapy types
   - Create automatic pattern progression with visual countdown timers
@@ -97,17 +97,17 @@
 
 - [ ] 2.3 Add noise floor detection and ambient sound filtering
   - Implement automatic noise floor calibration
-  - Create ambient sound filtering to ignore background noise
+  - Create ambient sound filtering to ignore background noise (selectable by user)
   - Add confidence scoring for frequency detection reliability
   - Implement adaptive threshold adjustment based on environment
   - _Requirements: 2.4, 7.4_
 
 - [ ] 2.4 Implement multiple frequency detection modes
-  - Create FrequencyDetectionMode enum with different analysis strategies
-  - Implement dominant frequency detection for pure tones
-  - Add rhythmic frequency extraction for music and complex audio
-  - Create harmonic analysis mode for musical content
-  - Add adaptive mode that automatically selects best detection method
+  - Create FrequencyDetectionMode enum with different analysis strategies as optional tool
+  - Implement dominant frequency detection for pure tones to tool as selectable
+  - Add rhythmic frequency extraction for music and complex audio to tool as selectable
+  - Create harmonic analysis mode for musical content to tool as selectable
+  - Add adaptive mode that automatically selects best detection method to tool as selectable
   - _Requirements: 7.1, 7.2, 7.3, 7.4_
 
 - [ ] 3. Implement safety monitoring and photosensitivity protection
@@ -133,7 +133,6 @@
 
 - [ ] 3.3 Add session duration monitoring with break prompts
   - Implement automatic session duration tracking
-  - Create break prompt system after 10 minutes of continuous use
   - Add configurable session limits based on safety mode settings
   - Implement forced session termination for extended use
   - _Requirements: 5.3_

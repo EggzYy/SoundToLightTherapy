@@ -211,6 +211,44 @@ public actor SessionPatternManager {
         }
     }
     
+    /// Share pattern as formatted text for easy sharing
+    public func sharePattern(id: UUID) async throws -> String {
+        if !isInitialized {
+            try await initialize()
+        }
+        
+        guard let pattern = cachedPatterns.first(where: { $0.id == id }) else {
+            throw SessionPatternError.patternNotFound(id)
+        }
+        
+        var shareText = "🎵 Therapy Pattern: \(pattern.name)\n"
+        shareText += "📝 Description: \(pattern.description)\n"
+        shareText += "⏱️ Duration: \(formatDuration(pattern.totalDuration))\n"
+        shareText += "🔢 Segments: \(pattern.segments.count)\n\n"
+        shareText += "📋 Pattern Timeline:\n"
+        
+        for (index, segment) in pattern.segments.enumerated() {
+            let startTime = formatDuration(segment.startTime)
+            let endTime = formatDuration(segment.endTime)
+            let intensity = Int(segment.intensity * 100)
+            
+            shareText += "\(index + 1). \(segment.therapyType.rawValue) (\(startTime) - \(endTime)) - \(intensity)%\n"
+        }
+        
+        shareText += "\n🧠 Created with Sound to Light Therapy App"
+        return shareText
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        if minutes > 0 {
+            return "\(minutes)m \(seconds)s"
+        } else {
+            return "\(seconds)s"
+        }
+    }
+    
     /// Get pattern statistics
     public func getPatternStatistics() async throws -> PatternStatistics {
         if !isInitialized {

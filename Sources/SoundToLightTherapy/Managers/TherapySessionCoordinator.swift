@@ -20,6 +20,9 @@ public actor TherapySessionCoordinator {
     private var currentSessionPattern: SessionPattern? = nil
     private var patternProgressTask: Task<Void, Never>? = nil
     private var currentPatternSegment: SessionPattern.TherapySegment? = nil
+    private var isSessionPaused: Bool = false
+    private var pausedAt: Date? = nil
+    private var totalPausedDuration: TimeInterval = 0.0
 
     public init() {
         // Note: Hardware calibration will be performed when needed, not during init
@@ -240,6 +243,9 @@ public actor TherapySessionCoordinator {
         // Clear pattern state
         currentSessionPattern = nil
         currentPatternSegment = nil
+        isSessionPaused = false
+        pausedAt = nil
+        totalPausedDuration = 0.0
 
         // Stop precision strobing
         if await precisionStrobeController.isCurrentlyStrobing() {
@@ -414,13 +420,20 @@ public actor TherapySessionCoordinator {
         var lastSegmentId: UUID? = nil
         
         while isSessionActive && !Task.isCancelled {
-            let elapsed = Date().timeIntervalSince(startTime)
+            // Use adjusted elapsed time that accounts for pauses
+            let elapsed = getAdjustedElapsedTime()
             
             // Check if session duration has been reached
             if elapsed >= pattern.totalDuration {
                 print("⏰ Pattern session completed")
                 await stopSession()
                 break
+            }
+            
+            // Skip processing if session is paused
+            if isSessionPaused {
+                try? await Task.sleep(nanoseconds: 100_000_000) // 100ms
+                continue
             }
             
             // Find the current active segment
@@ -512,13 +525,19 @@ public actor TherapySessionCoordinator {
             guard !Task.isCancelled else { break }
             guard isSessionActive else { break }
             
-            let elapsed = Date().timeIntervalSince(startTime)
+            // Use adjusted elapsed time that accounts for pauses
+            let elapsed = getAdjustedElapsedTime()
             
             // Check if session duration has been reached
             if elapsed >= pattern.totalDuration {
                 print("⏰ Audio-responsive pattern session completed")
                 await stopSession()
                 break
+            }
+            
+            // Skip processing if session is paused (but continue audio stream processing)
+            if isSessionPaused {
+                continue
             }
             
             // Find the current active segment
@@ -854,6 +873,104 @@ public actor TherapySessionCoordinator {
     /// Check if currently running an audio-responsive pattern session
     public func isAudioResponsivePatternSession() async -> Bool {
         return currentSessionPattern != nil && audioStream != nil
+    }
+    
+    // MARK: - Session Control
+    
+    /// Pause the current session
+    public func pauseSession() async throws {
+        guard isSessionActive else {
+            throw TherapySessionError.sessionNotActive
+        }
+        
+        guard !isSessionPaused else {
+            return // Already paused
+        }
+        
+        isSessionPaused = true
+        pausedAt = Date()
+        
+        // Stop strobing during pause
+        if await precisionStrobeController.isCurrentlyStrobing() {
+            try await precisionStrobeController.stopStrobing()
+        }
+        
+        // Stop flashlight
+        try? await flashlightController.setFlashlight(false)
+        
+        print("⏸️ Session paused")
+        _ = await HapticFeedbackSupport.generate(.lightImpact, respectReducedMotion: true)
+    }
+    
+    /// Resume the current session
+    public func resumeSession() async throws {
+        guard isSessionActive else {
+            throw TherapySessionError.sessionNotActive
+        }
+        
+        guard isSessionPaused else {
+            return // Not paused
+        }
+        
+        // Calculate paused duration
+        if let pauseStart = pausedAt {
+            totalPausedDuration += Date().timeIntervalSince(pauseStart)
+        }
+        
+        isSessionPaused = false
+        pausedAt = nil
+        
+        print("▶️ Session resumed")
+        _ = await HapticFeedbackSupport.generate(.mediumImpact, respectReducedMotion: true)
+    }
+    
+    /// Check if session is currently paused
+    public func isSessionPaused() async -> Bool {
+        return isSessionPaused
+    }
+    
+    /// Skip to next segment in pattern-based session
+    public func skipToNextSegment() async throws {
+        guard let pattern = currentSessionPattern,
+              let startTime = sessionStartTime else {
+            throw TherapySessionError.sessionNotActive
+        }
+        
+        let adjustedElapsed = getAdjustedElapsedTime()
+        
+        // Find next segment
+        guard let nextSegment = pattern.getNextSegment(after: adjustedElapsed) else {
+            print("⏭️ No next segment to skip to")
+            return
+        }
+        
+        // Calculate how much time to add to reach the next segment
+        let timeToAdd = nextSegment.startTime - adjustedElapsed
+        totalPausedDuration -= timeToAdd // Effectively skip forward
+        
+        print("⏭️ Skipped to next segment: \(nextSegment.therapyType.rawValue)")
+        _ = await HapticFeedbackSupport.generate(.mediumImpact, respectReducedMotion: true)
+    }
+    
+    /// Get adjusted elapsed time accounting for pauses
+    private func getAdjustedElapsedTime() -> TimeInterval {
+        guard let startTime = sessionStartTime else { return 0.0 }
+        
+        let rawElapsed = Date().timeIntervalSince(startTime)
+        var adjustedElapsed = rawElapsed - totalPausedDuration
+        
+        // If currently paused, subtract current pause duration
+        if isSessionPaused, let pauseStart = pausedAt {
+            adjustedElapsed -= Date().timeIntervalSince(pauseStart)
+        }
+        
+        return max(0.0, adjustedElapsed)
+    }
+    
+    /// Get session progress accounting for pauses
+    public func getAdjustedSessionProgress() async -> Double {
+        let adjustedElapsed = getAdjustedElapsedTime()
+        return min(1.0, adjustedElapsed / sessionDuration)
     }
 
 }

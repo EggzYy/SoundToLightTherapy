@@ -23,9 +23,14 @@ graph TB
     J[UI Controller] --> K[Real-time Display]
     H --> J
     D --> J
+    B --> J
+    F --> J
     
     L[Export Engine] --> M[Session Data]
     I --> L
+    
+    N[Haptic Feedback] --> J
+    D --> N
 ```
 
 ### Core Components
@@ -34,8 +39,9 @@ graph TB
 2. **Precision Strobe Controller**: High-accuracy timing engine for flashlight control
 3. **Safety Monitor**: Real-time safety checks and photosensitivity protection
 4. **Calibration Engine**: Hardware timing validation and correction
-5. **Session Manager**: Comprehensive session tracking and data collection
-6. **Therapeutic Frequency Mapper**: Intelligent mapping of audio frequencies to therapeutic ranges
+5. **User Interface Controller**: Real-time visual feedback and user interaction
+6. **Session Manager**: Comprehensive session tracking and data collection
+7. **Therapeutic Frequency Mapper**: Intelligent mapping of audio frequencies to therapeutic ranges
 
 ## Components and Interfaces
 
@@ -44,10 +50,12 @@ graph TB
 **Purpose**: Provide accurate, real-time frequency detection with therapeutic relevance
 
 **Key Improvements**:
-- Implement windowed FFT with overlap for smoother frequency tracking
-- Add spectral peak tracking for consistent frequency identification
-- Include noise floor detection to filter out ambient noise
-- Support multiple frequency extraction methods (dominant, harmonic, rhythmic)
+- Implement windowed FFT with overlap for smoother frequency tracking with <100ms detection latency
+- Add spectral peak tracking for consistent frequency identification with <200ms update response
+- Include noise floor detection to filter out ambient noise with user-configurable thresholds
+- Support multiple frequency extraction methods (dominant, harmonic, rhythmic) with automatic mode selection
+- Frequency smoothing options for inconsistent audio input
+- Therapeutic frequency prioritization for 1-40Hz optimal range
 
 **Interface**:
 ```swift
@@ -55,6 +63,9 @@ public actor EnhancedFrequencyDetector {
     func detectTherapeuticFrequency(from audioData: [Float]) async throws -> TherapeuticFrequencyResult
     func calibrateNoiseFloor() async throws
     func setDetectionMode(_ mode: FrequencyDetectionMode) async
+    func enableFrequencySmoothing(_ enabled: Bool) async
+    func setNoiseThreshold(_ threshold: Float) async
+    func getDetectionLatency() async -> TimeInterval
 }
 
 public struct TherapeuticFrequencyResult {
@@ -78,10 +89,12 @@ public enum FrequencyDetectionMode {
 **Purpose**: Deliver microsecond-accurate flashlight strobing at therapeutic frequencies
 
 **Key Features**:
-- High-resolution timing using CADisplayLink and DispatchSourceTimer
-- Hardware capability detection and adaptive frequency limiting
-- Jitter compensation and timing drift correction
+- High-resolution timing using CADisplayLink and DispatchSourceTimer with <5ms jitter for frequencies up to 40Hz
+- Hardware capability detection and adaptive frequency limiting with real-time capability reporting
+- Jitter compensation and timing drift correction with automatic recalibration
 - Emergency stop with <50ms response time
+- Haptic feedback fallback for hardware-limited frequencies
+- Battery level monitoring with accuracy impact warnings
 
 **Interface**:
 ```swift
@@ -92,6 +105,16 @@ public actor PrecisionStrobeController {
     func emergencyStop() async throws
     func getActualFrequency() async -> Float
     func getTimingAccuracy() async -> StrobeAccuracyMetrics
+    func enableHapticFallback(_ enabled: Bool) async
+    func getBatteryImpactWarning() async -> Bool
+    func getHardwareCapabilities() async -> HardwareCapabilities
+}
+
+public struct HardwareCapabilities {
+    let maxAccurateFrequency: Float          // Maximum frequency with <5ms jitter
+    let maxAttemptableFrequency: Float       // Hardware absolute maximum
+    let supportsHapticFeedback: Bool         // Haptic fallback availability
+    let batteryOptimizationAvailable: Bool   // Adaptive intensity support
 }
 
 public struct StrobeAccuracyMetrics {
@@ -110,9 +133,11 @@ public struct StrobeAccuracyMetrics {
 
 **Key Features**:
 - Real-time frequency monitoring for epilepsy-triggering ranges (15-25 Hz)
-- Session duration limits with automatic breaks
-- User acknowledgment system for safety warnings
-- Emergency stop functionality
+- Session duration limits with selectable breaks
+- User acknowledgment system for safety warnings and medical disclaimers
+- Emergency stop functionality with <50ms response time
+- Safety mode with 20Hz frequency limitation
+- App launch safety warnings with required user acknowledgment
 
 **Interface**:
 ```swift
@@ -135,9 +160,16 @@ public enum SafetyWarning {
     case highIntensity(level: Float)
     case batteryLow
 }
+
+public enum SafetyAction {
+    case allowWithWarning
+    case requireConfirmation
+    case forceStop
+    case suggestBreak
+}
 ```
 
-### 4. Calibration Engine
+### 7. Calibration Engine
 
 **Purpose**: Validate and correct timing accuracy for therapeutic precision
 
@@ -164,15 +196,45 @@ public struct CalibrationResults {
 }
 ```
 
-### 5. Session Manager
+### 5. User Interface Controller
+
+**Purpose**: Provide real-time visual feedback and user interaction for therapy monitoring
+
+**Key Features**:
+- Real-time frequency detection display with visual indicators
+- Target vs. achieved frequency comparison with accuracy percentage
+- Smooth visual transitions for frequency changes with haptic feedback
+- Accuracy warning indicators when precision falls below 95%
+- Session statistics display with therapeutic effectiveness metrics
+
+**Interface**:
+```swift
+public actor UIController {
+    func updateFrequencyDisplay(target: Float, achieved: Float, accuracy: Float) async
+    func showAccuracyWarning(_ show: Bool) async
+    func displaySessionStatistics(_ stats: SessionSummary) async
+    func triggerHapticFeedback(for event: HapticEvent) async
+    func updateVisualTransition(from oldFreq: Float, to newFreq: Float) async
+}
+
+public enum HapticEvent {
+    case frequencyChange
+    case accuracyWarning
+    case safetyAlert
+    case sessionComplete
+}
+```
+
+### 6. Session Manager
 
 **Purpose**: Comprehensive session tracking, data collection, and export
 
 **Key Features**:
-- Real-time session metrics collection
-- Frequency accuracy tracking
-- Session history management
-- Data export in multiple formats
+- Real-time session metrics collection with microsecond precision logging
+- Frequency accuracy tracking with target vs. achieved frequency comparison
+- Session history management with trend analysis
+- Data export in CSV and JSON formats with frequency histograms
+- Automatic timing drift detection and recalibration logging
 
 **Interface**:
 ```swift
@@ -191,6 +253,12 @@ public struct SessionConfiguration {
     let calibrationRequired: Bool
 }
 
+public enum ExportFormat {
+    case csv
+    case json
+    case detailedReport  // Includes frequency histograms and timing analysis
+}
+
 public struct SessionSummary {
     let sessionId: UUID
     let startTime: Date
@@ -198,6 +266,16 @@ public struct SessionSummary {
     let frequencyStats: FrequencyStatistics
     let accuracyMetrics: StrobeAccuracyMetrics
     let safetyEvents: [SafetyEvent]
+    let frequencyHistogram: [Float: Int]     // Frequency distribution data
+    let timingDeviations: [TimeInterval]     // Detailed timing accuracy data
+    let averageAccuracyPercentage: Float     // Overall session accuracy
+}
+
+public struct SafetyEvent {
+    let timestamp: Date
+    let eventType: SafetyWarning
+    let userResponse: SafetyAction
+    let frequencyAtEvent: Float
 }
 ```
 
@@ -222,6 +300,47 @@ public enum TherapyType: CaseIterable {
         case .beta: return 13.0...30.0
         case .gamma: return 30.0...100.0
         }
+    }
+    
+    var isOptimalTherapeuticRange: Bool {
+        // Prioritize 1-40 Hz range for optimal therapeutic effect
+        return self != .gamma || frequencyRange.lowerBound <= 40.0
+    }
+}
+
+// Frequency mapping strategies for different input types
+public enum FrequencyMappingStrategy {
+    case direct              // Direct 1:1 mapping within therapeutic range
+    case proportional        // Proportional scaling to therapeutic range
+    case harmonic           // Use harmonic relationships for musical input
+    case rhythmic           // Extract rhythmic patterns from complex audio
+    
+    func mapToTherapeutic(_ inputFreq: Float) -> Float {
+        switch self {
+        case .direct:
+            return max(0.5, min(100.0, inputFreq))
+        case .proportional:
+            // Map any input range proportionally to 0.5-100 Hz
+            return 0.5 + (inputFreq.truncatingRemainder(dividingBy: 99.5))
+        case .harmonic:
+            // Use musical harmonic relationships
+            return findTherapeuticHarmonic(of: inputFreq)
+        case .rhythmic:
+            // Extract tempo/rhythm and map to therapeutic frequency
+            return extractRhythmicFrequency(from: inputFreq)
+        }
+    }
+    
+    private func findTherapeuticHarmonic(of frequency: Float) -> Float {
+        // Implementation would find the most therapeutically relevant harmonic
+        // This is a placeholder for the actual harmonic analysis logic
+        return frequency
+    }
+    
+    private func extractRhythmicFrequency(from frequency: Float) -> Float {
+        // Implementation would extract rhythmic patterns from complex audio
+        // This is a placeholder for the actual rhythmic analysis logic
+        return frequency
     }
 }
 
@@ -351,11 +470,18 @@ public protocol ErrorRecoveryStrategy {
 
 ## Performance Considerations
 
-### Timing Optimization
+### Timing Requirements and Optimization
+- **Frequency Detection Latency**: <100ms for initial detection, <200ms for frequency changes
+- **Strobe Timing Accuracy**: <5ms jitter for frequencies up to 40Hz, best-effort for higher frequencies
+- **Emergency Stop Response**: <50ms complete shutdown time
+- **UI Update Responsiveness**: Real-time display updates synchronized with detection cycles
+
+### Technical Implementation
 - Use CADisplayLink for 60Hz refresh rate synchronization
 - Implement DispatchSourceTimer for sub-millisecond precision
 - Minimize memory allocations in real-time processing loops
 - Use actor isolation to prevent timing interference
+- Implement microsecond-precision logging for timing validation
 
 ### Battery Optimization
 - Implement adaptive intensity based on battery level

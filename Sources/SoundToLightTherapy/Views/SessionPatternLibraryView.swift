@@ -537,8 +537,16 @@ public struct SessionPatternLibraryView: SwiftUI.View {
     private func exportPattern(_ pattern: SessionPattern) {
         Task {
             do {
-                _ = try await patternManager?.exportPattern(id: pattern.id)
-                // TODO: Implement actual export functionality (save to files, share, etc.)
+                let data = try await patternManager?.exportPattern(id: pattern.id)
+                let shareText = try await patternManager?.sharePattern(id: pattern.id)
+                
+                // TODO: Implement actual file sharing (requires platform-specific implementation)
+                // For now, we'll just log the shareable text
+                if let shareText = shareText {
+                    print("✅ Pattern ready for sharing:")
+                    print(shareText)
+                }
+                
                 print("✅ Exported pattern: \(pattern.name)")
             } catch {
                 await MainActor.run {

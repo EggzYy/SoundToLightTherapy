@@ -32,6 +32,7 @@ public struct TherapyView: SwiftUI.View {
     @State private var isPatternModeEnabled: Bool = false
     @State private var isPatternAudioResponsive: Bool = false
     @State private var sessionStartTime: Date? = nil
+    @State private var isSessionPaused: Bool = false
 
     // Shared session coordinator instance
     private let sessionCoordinator = TherapySessionCoordinator()
@@ -202,33 +203,71 @@ public struct TherapyView: SwiftUI.View {
     }
 
     private var sessionControlSection: some View {
-        HStack(spacing: 20) {
-            Button("Start Session") {
-                Task {
-                    await startSession()
+        VStack(spacing: 12) {
+            // Main control buttons
+            HStack(spacing: 20) {
+                Button("Start Session") {
+                    Task {
+                        await startSession()
+                    }
                 }
-            }
-            .disabled(isSessionActive)
-            // TODO: Add accessibility labels and hints when SwiftCrossUI supports them
-            .withHapticFeedback(.mediumImpact, respectReducedMotion: true)
+                .disabled(isSessionActive)
+                // TODO: Add accessibility labels and hints when SwiftCrossUI supports them
+                .withHapticFeedback(.mediumImpact, respectReducedMotion: true)
 
-            Button("Stop Session") {
-                Task {
-                    await stopSession()
+                Button("Stop Session") {
+                    Task {
+                        await stopSession()
+                    }
                 }
+                .disabled(!isSessionActive)
+                // TODO: Add accessibility labels and hints when SwiftCrossUI supports them
+                .withHapticFeedback(.lightImpact, respectReducedMotion: true)
             }
-            .disabled(!isSessionActive)
-            // TODO: Add accessibility labels and hints when SwiftCrossUI supports them
-            .withHapticFeedback(.lightImpact, respectReducedMotion: true)
+            
+            // Session control buttons (pause/resume/skip) - only show during active sessions
+            if isSessionActive {
+                HStack(spacing: 16) {
+                    Button(isSessionPaused ? "Resume" : "Pause") {
+                        Task {
+                            if isSessionPaused {
+                                await resumeSession()
+                            } else {
+                                await pauseSession()
+                            }
+                        }
+                    }
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(isSessionPaused ? Color.green.opacity(0.2) : Color.orange.opacity(0.2))
+                    .cornerRadius(8)
+                    .withHapticFeedback(.lightImpact, respectReducedMotion: true)
+                    
+                    // Skip button only for pattern sessions
+                    if isPatternModeEnabled {
+                        Button("Skip Segment") {
+                            Task {
+                                await skipToNextSegment()
+                            }
+                        }
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.blue.opacity(0.2))
+                        .cornerRadius(8)
+                        .withHapticFeedback(.lightImpact, respectReducedMotion: true)
+                    }
+                }
+                .font(.caption)
+            }
         }
         // TODO: Add accessibility grouping when SwiftCrossUI supports them
     }
 
     private var statusDisplaySection: some View {
         VStack(spacing: 10) {
-            Text("Session Status: \(isSessionActive ? "Active" : "Inactive")")
+            Text("Session Status: \(sessionStatusText)")
                 .font(.headline)
-                .foregroundColor(isSessionActive ? .green : Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                .foregroundColor(sessionStatusColor)
             // TODO: Add accessibility labels and traits when SwiftCrossUI supports them
 
             Text("Current Frequency: \(String(format: "%.1f", currentFrequency)) Hz")
@@ -344,6 +383,26 @@ public struct TherapyView: SwiftUI.View {
               let nextSegment = getNextSegment(pattern: pattern) else { return 0.0 }
         let elapsed = Date().timeIntervalSince(startTime)
         return max(0.0, nextSegment.startTime - elapsed)
+    }
+    
+    private var sessionStatusText: String {
+        if !isSessionActive {
+            return "Inactive"
+        } else if isSessionPaused {
+            return "Paused"
+        } else {
+            return "Active"
+        }
+    }
+    
+    private var sessionStatusColor: Color {
+        if !isSessionActive {
+            return Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0)
+        } else if isSessionPaused {
+            return Color.orange
+        } else {
+            return Color.green
+        }
     }
     
     private var sessionPatternSelectionSection: some View {
@@ -820,6 +879,35 @@ public struct TherapyView: SwiftUI.View {
         // Always generate strong haptic for emergency stop
         _ = HapticFeedbackSupport.generate(.heavyImpact, respectReducedMotion: false)
     }
+    
+    private func pauseSession() async {
+        do {
+            try await sessionCoordinator.pauseSession()
+            isSessionPaused = true
+            print("⏸️ Session paused")
+        } catch {
+            print("❌ Failed to pause session: \(error)")
+        }
+    }
+    
+    private func resumeSession() async {
+        do {
+            try await sessionCoordinator.resumeSession()
+            isSessionPaused = false
+            print("▶️ Session resumed")
+        } catch {
+            print("❌ Failed to resume session: \(error)")
+        }
+    }
+    
+    private func skipToNextSegment() async {
+        do {
+            try await sessionCoordinator.skipToNextSegment()
+            print("⏭️ Skipped to next segment")
+        } catch {
+            print("❌ Failed to skip segment: \(error)")
+        }
+    }
 
     private func announceProgressIfNeeded(_ progress: Double) async {
         let currentPercent = Int(progress * 100)
@@ -843,7 +931,8 @@ public struct TherapyView: SwiftUI.View {
 
         if activeState {
             currentFrequency = await sessionCoordinator.getCurrentFrequency()
-            sessionProgress = await sessionCoordinator.getSessionProgress()
+            sessionProgress = await sessionCoordinator.getAdjustedSessionProgress()
+            isSessionPaused = await sessionCoordinator.isSessionPaused()
             
             // Get enhanced therapeutic information
             if currentFrequency > 0 {
