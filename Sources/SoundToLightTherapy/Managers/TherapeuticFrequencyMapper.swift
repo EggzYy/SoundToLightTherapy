@@ -6,7 +6,7 @@ public actor TherapeuticFrequencyMapper {
     // MARK: - Types
     
     /// Brainwave frequency categories for therapeutic applications
-    public enum TherapyType: String, CaseIterable, Sendable {
+    public enum TherapyType: String, CaseIterable, Sendable, Codable {
         case delta = "Delta"
         case theta = "Theta"
         case alpha = "Alpha"

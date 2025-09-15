@@ -15,6 +15,11 @@ public actor TherapySessionCoordinator {
     private var sessionDuration: TimeInterval = 300.0
     private var currentFrequency: Float = 0.0
     private var sessionStartTime: Date?
+    
+    // Pattern-based session state
+    private var currentSessionPattern: SessionPattern? = nil
+    private var patternProgressTask: Task<Void, Never>? = nil
+    private var currentPatternSegment: SessionPattern.TherapySegment? = nil
 
     public init() {
         // Note: Hardware calibration will be performed when needed, not during init
@@ -47,6 +52,8 @@ public actor TherapySessionCoordinator {
         case audioCaptureFailed
         case frequencyDetectionFailed
         case flashlightControlFailed
+        case invalidSessionPattern
+        case patternValidationFailed([SessionPattern.ValidationError])
     }
 
     public func startAudioResponsiveSession(duration: TimeInterval = 300.0) async throws {
@@ -85,6 +92,53 @@ public actor TherapySessionCoordinator {
             _ = await HapticFeedbackSupport.generate(.mediumImpact, respectReducedMotion: true)
 
             print("✅ Audio-responsive therapy session started - duration: \(duration)s, wake lock enabled")
+        } catch {
+            await stopSession()
+            throw TherapySessionError.audioCaptureFailed
+        }
+    }
+    
+    public func startPatternBasedSession(pattern: SessionPattern) async throws {
+        guard !isSessionActive else {
+            throw TherapySessionError.sessionAlreadyActive
+        }
+        
+        // Validate the pattern before starting
+        let validation = pattern.validate()
+        guard validation.isValid else {
+            throw TherapySessionError.patternValidationFailed(validation.errors)
+        }
+        
+        // Configure session parameters from pattern
+        self.currentSessionPattern = pattern
+        self.sessionDuration = pattern.totalDuration
+        self.sessionStartTime = Date()
+        self.targetFrequency = 0.0  // Will be determined by pattern segments
+        
+        do {
+            // Enable screen wake lock to prevent device from sleeping
+            try await ScreenWakeLock.shared.enableWakeLock()
+            
+            // Ensure flashlight starts in OFF state
+            try await flashlightController.setFlashlight(false)
+            print("🔦 Flashlight initialized to OFF state")
+            
+            // Perform calibration check in background (non-blocking)
+            Task {
+                await performInitialCalibrationIfNeeded()
+            }
+            
+            isSessionActive = true
+            
+            // Start pattern progression
+            patternProgressTask = Task {
+                await processPatternBasedSession()
+            }
+            
+            // Generate haptic feedback for session start
+            _ = await HapticFeedbackSupport.generate(.mediumImpact, respectReducedMotion: true)
+            
+            print("✅ Pattern-based therapy session started: \(pattern.name) - duration: \(pattern.totalDuration)s")
         } catch {
             await stopSession()
             throw TherapySessionError.audioCaptureFailed
@@ -129,8 +183,14 @@ public actor TherapySessionCoordinator {
         isSessionActive = false
         detectionTask?.cancel()
         detectionTask = nil
+        patternProgressTask?.cancel()
+        patternProgressTask = nil
         await audioCaptureManager.stopCapture()
         audioStream = nil
+
+        // Clear pattern state
+        currentSessionPattern = nil
+        currentPatternSegment = nil
 
         // Stop precision strobing
         if await precisionStrobeController.isCurrentlyStrobing() {
@@ -289,6 +349,107 @@ public actor TherapySessionCoordinator {
             try? await precisionStrobeController.stopStrobing()
         }
         print("🔆 Precision audio-responsive mode completed")
+    }
+    
+    // MARK: - Pattern-Based Processing
+    
+    private func processPatternBasedSession() async {
+        guard let pattern = currentSessionPattern else {
+            print("❌ No session pattern available for processing")
+            return
+        }
+        
+        print("🎵 Starting pattern-based session: \(pattern.name)")
+        
+        let startTime = Date()
+        var lastSegmentId: UUID? = nil
+        
+        while isSessionActive && !Task.isCancelled {
+            let elapsed = Date().timeIntervalSince(startTime)
+            
+            // Check if session duration has been reached
+            if elapsed >= pattern.totalDuration {
+                print("⏰ Pattern session completed")
+                await stopSession()
+                break
+            }
+            
+            // Find the current active segment
+            if let activeSegment = pattern.getActiveSegment(at: elapsed) {
+                // Check if we've moved to a new segment
+                if activeSegment.id != lastSegmentId {
+                    currentPatternSegment = activeSegment
+                    lastSegmentId = activeSegment.id
+                    
+                    print("🎯 Switching to segment: \(activeSegment.therapyType.rawValue) (\(formatDuration(activeSegment.duration)))")
+                    
+                    // Stop current strobing for transition
+                    if await precisionStrobeController.isCurrentlyStrobing() {
+                        try? await precisionStrobeController.stopStrobing()
+                        
+                        // Apply transition delay if needed
+                        let transitionDuration = activeSegment.transitionType.duration
+                        if transitionDuration > 0 {
+                            print("🔄 Applying \(activeSegment.transitionType.rawValue) transition (\(transitionDuration)s)")
+                            try? await Task.sleep(nanoseconds: UInt64(transitionDuration * 1_000_000_000))
+                        }
+                    }
+                    
+                    // Calculate target frequency for this segment
+                    let targetFreq: Float
+                    if let specificFreq = activeSegment.targetFrequency {
+                        targetFreq = specificFreq
+                    } else {
+                        // Use middle of therapy type range
+                        let range = activeSegment.therapyType.frequencyRange
+                        targetFreq = (range.lowerBound + range.upperBound) / 2.0
+                    }
+                    
+                    // Update current frequency for UI display
+                    currentFrequency = targetFreq
+                    
+                    // Start strobing at the segment frequency
+                    do {
+                        try await precisionStrobeController.startStrobing(
+                            frequency: targetFreq,
+                            intensity: activeSegment.intensity
+                        )
+                        print("✅ Started strobing at \(targetFreq)Hz (intensity: \(Int(activeSegment.intensity * 100))%)")
+                    } catch {
+                        print("❌ Failed to start strobing for segment: \(error)")
+                    }
+                }
+            } else {
+                // No active segment - this shouldn't happen with valid patterns
+                print("⚠️ No active segment found at time \(elapsed)s")
+                currentPatternSegment = nil
+                
+                // Stop strobing if no active segment
+                if await precisionStrobeController.isCurrentlyStrobing() {
+                    try? await precisionStrobeController.stopStrobing()
+                }
+            }
+            
+            // Update every 100ms for smooth transitions
+            try? await Task.sleep(nanoseconds: 100_000_000)
+        }
+        
+        // Ensure strobing is stopped when pattern processing ends
+        if await precisionStrobeController.isCurrentlyStrobing() {
+            try? await precisionStrobeController.stopStrobing()
+        }
+        
+        print("🔆 Pattern-based session processing completed")
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        if minutes > 0 {
+            return "\(minutes)m \(seconds)s"
+        } else {
+            return "\(seconds)s"
+        }
     }
 
     private func processAudioAndControlFlashlight() async {
@@ -450,6 +611,32 @@ public actor TherapySessionCoordinator {
     /// Get current therapy type override
     public func getCurrentTherapyTypeOverride() async -> TherapeuticFrequencyMapper.TherapyType? {
         return await frequencyDetector.getCurrentTherapyTypeOverride()
+    }
+    
+    // MARK: - Pattern Session Information
+    
+    /// Get the current session pattern if running a pattern-based session
+    public func getCurrentSessionPattern() async -> SessionPattern? {
+        return currentSessionPattern
+    }
+    
+    /// Get the currently active pattern segment
+    public func getCurrentPatternSegment() async -> SessionPattern.TherapySegment? {
+        return currentPatternSegment
+    }
+    
+    /// Get the next pattern segment that will be activated
+    public func getNextPatternSegment() async -> SessionPattern.TherapySegment? {
+        guard let pattern = currentSessionPattern,
+              let startTime = sessionStartTime else { return nil }
+        
+        let elapsed = Date().timeIntervalSince(startTime)
+        return pattern.getNextSegment(after: elapsed)
+    }
+    
+    /// Check if currently running a pattern-based session
+    public func isPatternBasedSession() async -> Bool {
+        return currentSessionPattern != nil
     }
 
 }

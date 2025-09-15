@@ -24,6 +24,13 @@ public struct TherapyView: SwiftUI.View {
     @State private var selectedTherapyType: TherapeuticFrequencyMapper.TherapyType? = nil
     @State private var isTherapyTypeOverrideEnabled: Bool = false
     @State private var showTherapyTypeSelector: Bool = false
+    
+    // Session pattern management
+    @State private var selectedSessionPattern: SessionPattern? = nil
+    @State private var showingPatternLibrary: Bool = false
+    @State private var showingPatternDesigner: Bool = false
+    @State private var isPatternModeEnabled: Bool = false
+    @State private var sessionStartTime: Date? = nil
 
     // Shared session coordinator instance
     private let sessionCoordinator = TherapySessionCoordinator()
@@ -49,6 +56,9 @@ public struct TherapyView: SwiftUI.View {
             // Status display section
             statusDisplaySection
 
+            // Session pattern selection section
+            sessionPatternSelectionSection
+            
             // Therapy type selection section
             therapyTypeSelectionSection
             
@@ -216,6 +226,11 @@ public struct TherapyView: SwiftUI.View {
 
             ProgressView(value: sessionProgress)
             // TODO: Add accessibility support for progress view when SwiftCrossUI supports them
+            
+            // Pattern progress display
+            if isSessionActive && isPatternModeEnabled, let pattern = selectedSessionPattern {
+                patternProgressDisplay(pattern)
+            }
 
             // Wake lock status indicator
             HStack {
@@ -230,6 +245,271 @@ public struct TherapyView: SwiftUI.View {
             }
         }
         // TODO: Add accessibility grouping when SwiftCrossUI supports them
+    }
+    
+    private func patternProgressDisplay(_ pattern: SessionPattern) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("🎵 Pattern: \(pattern.name)")
+                .font(.caption)
+                .fontWeight(.bold)
+                .foregroundColor(.purple)
+            
+            // Current segment info
+            if let currentSegment = getCurrentActiveSegment(pattern: pattern) {
+                HStack {
+                    Text("Current:")
+                        .font(.caption)
+                        .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                    
+                    Text(currentSegment.therapyType.rawValue)
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(therapyTypeColor(currentSegment.therapyType.rawValue))
+                    
+                    Spacer()
+                    
+                    let segmentProgress = getSegmentProgress(segment: currentSegment)
+                    Text("\(Int(segmentProgress * 100))%")
+                        .font(.caption)
+                        .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                }
+                
+                // Segment progress bar
+                ProgressView(value: getSegmentProgress(segment: currentSegment))
+                    .progressViewStyle(LinearProgressViewStyle(tint: therapyTypeColor(currentSegment.therapyType.rawValue)))
+                    .frame(height: 4)
+            }
+            
+            // Next segment preview
+            if let nextSegment = getNextSegment(pattern: pattern) {
+                HStack {
+                    Text("Next:")
+                        .font(.caption)
+                        .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                    
+                    Text(nextSegment.therapyType.rawValue)
+                        .font(.caption)
+                        .foregroundColor(therapyTypeColor(nextSegment.therapyType.rawValue))
+                    
+                    Spacer()
+                    
+                    let timeToNext = getTimeToNextSegment(pattern: pattern)
+                    Text("in \(formatDuration(timeToNext))")
+                        .font(.caption)
+                        .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                }
+            }
+        }
+        .padding()
+        .background(Color(hue: 0.8, saturation: 0.1, brightness: 0.95, opacity: 1.0))
+        .cornerRadius(8)
+    }
+    
+    private func getCurrentActiveSegment(pattern: SessionPattern) -> SessionPattern.TherapySegment? {
+        guard let startTime = sessionStartTime else { return nil }
+        let elapsed = Date().timeIntervalSince(startTime)
+        return pattern.getActiveSegment(at: elapsed)
+    }
+    
+    private func getNextSegment(pattern: SessionPattern) -> SessionPattern.TherapySegment? {
+        guard let startTime = sessionStartTime else { return nil }
+        let elapsed = Date().timeIntervalSince(startTime)
+        return pattern.getNextSegment(after: elapsed)
+    }
+    
+    private func getSegmentProgress(segment: SessionPattern.TherapySegment) -> Double {
+        guard let startTime = sessionStartTime else { return 0.0 }
+        let elapsed = Date().timeIntervalSince(startTime)
+        let segmentElapsed = elapsed - segment.startTime
+        return max(0.0, min(1.0, segmentElapsed / segment.duration))
+    }
+    
+    private func getTimeToNextSegment(pattern: SessionPattern) -> TimeInterval {
+        guard let startTime = sessionStartTime,
+              let nextSegment = getNextSegment(pattern: pattern) else { return 0.0 }
+        let elapsed = Date().timeIntervalSince(startTime)
+        return max(0.0, nextSegment.startTime - elapsed)
+    }
+    
+    private var sessionPatternSelectionSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text("🎵 Session Pattern")
+                    .font(.headline)
+                    .foregroundColor(.green)
+                
+                Spacer()
+                
+                Button(action: {
+                    showingPatternLibrary = true
+                }) {
+                    Text("Browse")
+                        .font(.caption)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(Color.green.opacity(0.2))
+                        .cornerRadius(8)
+                }
+            }
+            
+            VStack(spacing: 8) {
+                // Pattern mode toggle
+                HStack {
+                    Text("Pattern Mode:")
+                        .font(.caption)
+                        .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                    
+                    Spacer()
+                    
+                    Button(action: {
+                        isPatternModeEnabled.toggle()
+                        if !isPatternModeEnabled {
+                            selectedSessionPattern = nil
+                        }
+                    }) {
+                        Text(isPatternModeEnabled ? "ON" : "OFF")
+                            .font(.caption)
+                            .fontWeight(.bold)
+                            .foregroundColor(isPatternModeEnabled ? .white : .gray)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 4)
+                            .background(isPatternModeEnabled ? Color.green : Color.gray.opacity(0.3))
+                            .cornerRadius(6)
+                    }
+                }
+                
+                // Selected pattern display
+                if isPatternModeEnabled {
+                    if let pattern = selectedSessionPattern {
+                        selectedPatternDisplay(pattern)
+                    } else {
+                        Button("Select Pattern") {
+                            showingPatternLibrary = true
+                        }
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 8)
+                        .background(Color.green.opacity(0.2))
+                        .cornerRadius(8)
+                    }
+                }
+            }
+        }
+        .padding()
+        .background(Color(hue: 0.3, saturation: 0.1, brightness: 0.95, opacity: 1.0))
+        .cornerRadius(8)
+        .sheet(isPresented: $showingPatternLibrary) {
+            SessionPatternLibraryView(
+                onPatternSelected: { pattern in
+                    selectedSessionPattern = pattern
+                    showingPatternLibrary = false
+                },
+                onClose: {
+                    showingPatternLibrary = false
+                }
+            )
+        }
+        .sheet(isPresented: $showingPatternDesigner) {
+            SessionPatternDesignerView(
+                onSave: { pattern in
+                    selectedSessionPattern = pattern
+                    showingPatternDesigner = false
+                },
+                onCancel: {
+                    showingPatternDesigner = false
+                }
+            )
+        }
+        // TODO: Add accessibility grouping when SwiftCrossUI supports them
+    }
+    
+    private func selectedPatternDisplay(_ pattern: SessionPattern) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(pattern.name)
+                        .font(.caption)
+                        .fontWeight(.bold)
+                        .foregroundColor(.green)
+                    
+                    Text(pattern.description)
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                        .lineLimit(2)
+                }
+                
+                Spacer()
+                
+                VStack(alignment: .trailing, spacing: 2) {
+                    Text(formatDuration(pattern.totalDuration))
+                        .font(.caption)
+                        .fontWeight(.medium)
+                    
+                    Text("\(pattern.segments.count) segments")
+                        .font(.system(size: 10))
+                        .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                }
+            }
+            
+            // Pattern timeline preview
+            HStack(spacing: 0) {
+                ForEach(pattern.segments.indices, id: \.self) { index in
+                    let segment = pattern.segments[index]
+                    let widthRatio = segment.duration / pattern.totalDuration
+                    
+                    Rectangle()
+                        .fill(therapyTypeColor(segment.therapyType.rawValue))
+                        .frame(height: 6)
+                        .frame(maxWidth: .infinity)
+                        .scaleEffect(x: widthRatio, anchor: .leading)
+                }
+            }
+            .cornerRadius(3)
+            
+            // Action buttons
+            HStack(spacing: 8) {
+                Button("Change") {
+                    showingPatternLibrary = true
+                }
+                .font(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.blue.opacity(0.2))
+                .cornerRadius(4)
+                
+                Button("Edit") {
+                    showingPatternDesigner = true
+                }
+                .font(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.orange.opacity(0.2))
+                .cornerRadius(4)
+                
+                Button("Clear") {
+                    selectedSessionPattern = nil
+                }
+                .font(.caption)
+                .padding(.horizontal, 8)
+                .padding(.vertical, 4)
+                .background(Color.red.opacity(0.2))
+                .cornerRadius(4)
+                
+                Spacer()
+            }
+        }
+        .padding()
+        .background(Color.white.opacity(0.8))
+        .cornerRadius(6)
+    }
+    
+    private func formatDuration(_ duration: TimeInterval) -> String {
+        let minutes = Int(duration) / 60
+        let seconds = Int(duration) % 60
+        if minutes > 0 {
+            return "\(minutes)m \(seconds)s"
+        } else {
+            return "\(seconds)s"
+        }
     }
     
     private var therapyTypeSelectionSection: some View {
@@ -434,15 +714,24 @@ public struct TherapyView: SwiftUI.View {
     // MARK: - Session Management
     private func startSession() async {
         do {
-            try await sessionCoordinator.startAudioResponsiveSession(duration: sessionDuration)
+            if isPatternModeEnabled, let pattern = selectedSessionPattern {
+                // Start pattern-based session
+                try await sessionCoordinator.startPatternBasedSession(pattern: pattern)
+                print("✅ Pattern-based therapy session started: \(pattern.name)")
+            } else {
+                // Start audio-responsive session
+                try await sessionCoordinator.startAudioResponsiveSession(duration: sessionDuration)
+                print("✅ Audio-responsive therapy session started")
+            }
+            
             isSessionActive = true
+            sessionStartTime = Date()
 
             // Start updating UI with real-time data
             Task {
                 await updateSessionDataLoop()
             }
 
-            print("✅ Therapy session started successfully!")
             // Generate haptic feedback for session start
             _ = HapticFeedbackSupport.generate(.mediumImpact, respectReducedMotion: true)
         } catch {
@@ -455,6 +744,7 @@ public struct TherapyView: SwiftUI.View {
     private func stopSession() async {
         await sessionCoordinator.stopSession()
         isSessionActive = false
+        sessionStartTime = nil
         print("🛑 Therapy session stopped")
         // Generate haptic feedback for session stop
         _ = HapticFeedbackSupport.generate(.lightImpact, respectReducedMotion: true)
@@ -463,6 +753,7 @@ public struct TherapyView: SwiftUI.View {
     private func emergencyStop() async {
         await sessionCoordinator.stopSession()
         isSessionActive = false
+        sessionStartTime = nil
 
         // Force disable wake lock for emergency stop
         await ScreenWakeLock.shared.forceDisableWakeLock()

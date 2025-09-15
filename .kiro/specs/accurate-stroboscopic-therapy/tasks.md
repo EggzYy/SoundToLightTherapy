@@ -63,7 +63,7 @@
   - Add therapy type lock/unlock toggle for maintaining selected type
   - _Requirements: 8.1, 8.2_
 
-- [ ] 2.25.2 Implement session pattern designer and management
+- [x] 2.25.2 Implement session pattern designer and management
   - Create SessionPattern data model with timed therapy type sequences
   - Implement pattern designer UI with drag-and-drop therapy type segments
   - Add pattern validation to ensure total duration matches session length
