@@ -30,6 +30,7 @@ public struct TherapyView: SwiftUI.View {
     @State private var showingPatternLibrary: Bool = false
     @State private var showingPatternDesigner: Bool = false
     @State private var isPatternModeEnabled: Bool = false
+    @State private var isPatternAudioResponsive: Bool = false
     @State private var sessionStartTime: Date? = nil
 
     // Shared session coordinator instance
@@ -43,38 +44,40 @@ public struct TherapyView: SwiftUI.View {
     public init() {}
 
     public var body: some View {
-        VStack(spacing: 20) {
-            // Header section
-            headerSection
+        ScrollView {
+            VStack(spacing: 20) {
+                // Header section
+                headerSection
 
-            // Audio responsiveness display section
-            audioResponseSection
+                // Audio responsiveness display section
+                audioResponseSection
 
-            // Session control section
-            sessionControlSection
+                // Session control section
+                sessionControlSection
 
-            // Status display section
-            statusDisplaySection
+                // Status display section
+                statusDisplaySection
 
-            // Session pattern selection section
-            sessionPatternSelectionSection
-            
-            // Therapy type selection section
-            therapyTypeSelectionSection
-            
-            // Therapeutic recommendations section
-            if isSessionActive {
-                therapeuticRecommendationsSection
+                // Session pattern selection section
+                sessionPatternSelectionSection
+                
+                // Therapy type selection section
+                therapyTypeSelectionSection
+                
+                // Therapeutic recommendations section
+                if isSessionActive {
+                    therapeuticRecommendationsSection
+                }
+
+                // Emergency stop section
+                emergencyStopSection
+
+                // Settings section
+                settingsSection
             }
-
-            // Emergency stop section
-            emergencyStopSection
-
-            // Settings section
-            settingsSection
+            .padding()
+            .frame(maxWidth: 600)
         }
-        .padding()
-        .frame(maxWidth: 600)
         .background(accessibleColorToColor(ColorContrastSupport.AccessiblePalettes.backgroundLight))
         // TODO: Add accessibility support when SwiftCrossUI implements accessibility APIs
         // TODO: Add onChange support when SwiftCrossUI supports it
@@ -102,10 +105,22 @@ public struct TherapyView: SwiftUI.View {
                 .font(.headline)
                 .foregroundColor(.blue)
 
-            Text("Flashlight automatically syncs to detected audio frequencies")
-                .font(.subheadline)
-                .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
-                .multilineTextAlignment(.center)
+            if isPatternModeEnabled && isPatternAudioResponsive {
+                Text("Pattern guides therapy types, frequencies sync to audio")
+                    .font(.subheadline)
+                    .foregroundColor(.blue)
+                    .multilineTextAlignment(.center)
+            } else if isPatternModeEnabled {
+                Text("Pattern runs with fixed frequencies")
+                    .font(.subheadline)
+                    .foregroundColor(.purple)
+                    .multilineTextAlignment(.center)
+            } else {
+                Text("Flashlight automatically syncs to detected audio frequencies")
+                    .font(.subheadline)
+                    .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                    .multilineTextAlignment(.center)
+            }
 
             // Enhanced real-time audio analysis display
             VStack(spacing: 8) {
@@ -375,6 +390,43 @@ public struct TherapyView: SwiftUI.View {
                             .padding(.vertical, 4)
                             .background(isPatternModeEnabled ? Color.green : Color.gray.opacity(0.3))
                             .cornerRadius(6)
+                    }
+                }
+                
+                // Audio responsive toggle for pattern mode
+                if isPatternModeEnabled {
+                    HStack {
+                        Text("Audio Responsive:")
+                            .font(.caption)
+                            .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                        
+                        Spacer()
+                        
+                        Button(action: {
+                            isPatternAudioResponsive.toggle()
+                        }) {
+                            Text(isPatternAudioResponsive ? "ON" : "OFF")
+                                .font(.caption)
+                                .fontWeight(.bold)
+                                .foregroundColor(isPatternAudioResponsive ? .white : .gray)
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 4)
+                                .background(isPatternAudioResponsive ? Color.blue : Color.gray.opacity(0.3))
+                                .cornerRadius(6)
+                        }
+                    }
+                    
+                    // Audio responsive explanation
+                    if isPatternAudioResponsive {
+                        Text("Pattern guides therapy types, frequencies respond to audio input")
+                            .font(.system(size: 10))
+                            .foregroundColor(.blue)
+                            .multilineTextAlignment(.leading)
+                    } else {
+                        Text("Pattern runs with fixed frequencies, independent of audio")
+                            .font(.system(size: 10))
+                            .foregroundColor(Color(hue: 0.5, saturation: 0.5, brightness: 0.5, opacity: 1.0))
+                            .multilineTextAlignment(.leading)
                     }
                 }
                 
@@ -715,9 +767,15 @@ public struct TherapyView: SwiftUI.View {
     private func startSession() async {
         do {
             if isPatternModeEnabled, let pattern = selectedSessionPattern {
-                // Start pattern-based session
-                try await sessionCoordinator.startPatternBasedSession(pattern: pattern)
-                print("✅ Pattern-based therapy session started: \(pattern.name)")
+                if isPatternAudioResponsive {
+                    // Start audio-responsive pattern session
+                    try await sessionCoordinator.startAudioResponsivePatternSession(pattern: pattern)
+                    print("✅ Audio-responsive pattern session started: \(pattern.name)")
+                } else {
+                    // Start fixed pattern-based session
+                    try await sessionCoordinator.startPatternBasedSession(pattern: pattern)
+                    print("✅ Fixed pattern session started: \(pattern.name)")
+                }
             } else {
                 // Start audio-responsive session
                 try await sessionCoordinator.startAudioResponsiveSession(duration: sessionDuration)
@@ -802,12 +860,15 @@ public struct TherapyView: SwiftUI.View {
                 therapeuticRecommendations = therapeuticMapping.recommendations
             }
             
-            // Sync therapy type override state
-            let currentOverride = await sessionCoordinator.getCurrentTherapyTypeOverride()
-            if currentOverride != selectedTherapyType {
-                selectedTherapyType = currentOverride
+            // Sync therapy type override state (but not during pattern sessions)
+            let isPatternSession = await sessionCoordinator.isPatternBasedSession()
+            if !isPatternSession {
+                let currentOverride = await sessionCoordinator.getCurrentTherapyTypeOverride()
+                if currentOverride != selectedTherapyType {
+                    selectedTherapyType = currentOverride
+                }
+                isTherapyTypeOverrideEnabled = (currentOverride != nil)
             }
-            isTherapyTypeOverrideEnabled = (currentOverride != nil)
 
             // Announce progress if needed
             await announceProgressIfNeeded(sessionProgress)

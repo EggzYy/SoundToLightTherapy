@@ -144,6 +144,55 @@ public actor TherapySessionCoordinator {
             throw TherapySessionError.audioCaptureFailed
         }
     }
+    
+    public func startAudioResponsivePatternSession(pattern: SessionPattern) async throws {
+        guard !isSessionActive else {
+            throw TherapySessionError.sessionAlreadyActive
+        }
+        
+        // Validate the pattern before starting
+        let validation = pattern.validate()
+        guard validation.isValid else {
+            throw TherapySessionError.patternValidationFailed(validation.errors)
+        }
+        
+        // Configure session parameters from pattern
+        self.currentSessionPattern = pattern
+        self.sessionDuration = pattern.totalDuration
+        self.sessionStartTime = Date()
+        self.targetFrequency = 0.0  // Will be determined by audio input
+        
+        do {
+            // Enable screen wake lock to prevent device from sleeping
+            try await ScreenWakeLock.shared.enableWakeLock()
+            
+            // Ensure flashlight starts in OFF state
+            try await flashlightController.setFlashlight(false)
+            print("🔦 Flashlight initialized to OFF state")
+            
+            // Perform calibration check in background (non-blocking)
+            Task {
+                await performInitialCalibrationIfNeeded()
+            }
+            
+            // Start audio capture for audio-responsive pattern mode
+            audioStream = try await audioCaptureManager.startCapture()
+            isSessionActive = true
+            
+            // Start audio-responsive pattern processing
+            detectionTask = Task {
+                await processAudioResponsivePatternSession()
+            }
+            
+            // Generate haptic feedback for session start
+            _ = await HapticFeedbackSupport.generate(.mediumImpact, respectReducedMotion: true)
+            
+            print("✅ Audio-responsive pattern session started: \(pattern.name) - duration: \(pattern.totalDuration)s")
+        } catch {
+            await stopSession()
+            throw TherapySessionError.audioCaptureFailed
+        }
+    }
 
     // Keep original method for backward compatibility
     public func startSession(targetFrequency: Float = 10.0, duration: TimeInterval = 300.0) async throws {
@@ -442,6 +491,169 @@ public actor TherapySessionCoordinator {
         print("🔆 Pattern-based session processing completed")
     }
     
+    // MARK: - Audio-Responsive Pattern Processing
+    
+    private func processAudioResponsivePatternSession() async {
+        guard let pattern = currentSessionPattern,
+              let audioStream = audioStream else {
+            print("❌ No session pattern or audio stream available for processing")
+            return
+        }
+        
+        print("🎵 Starting audio-responsive pattern session: \(pattern.name)")
+        
+        let startTime = Date()
+        var lastSegmentId: UUID? = nil
+        var currentStrobingFrequency: Float = 0.0
+        var consecutiveNoSignalCount = 0
+        let maxNoSignalCount = 30
+        
+        for await audioBuffer in audioStream {
+            guard !Task.isCancelled else { break }
+            guard isSessionActive else { break }
+            
+            let elapsed = Date().timeIntervalSince(startTime)
+            
+            // Check if session duration has been reached
+            if elapsed >= pattern.totalDuration {
+                print("⏰ Audio-responsive pattern session completed")
+                await stopSession()
+                break
+            }
+            
+            // Find the current active segment
+            if let activeSegment = pattern.getActiveSegment(at: elapsed) {
+                // Check if we've moved to a new segment
+                if activeSegment.id != lastSegmentId {
+                    currentPatternSegment = activeSegment
+                    lastSegmentId = activeSegment.id
+                    
+                    print("🎯 Pattern segment: \(activeSegment.therapyType.rawValue) (\(formatDuration(activeSegment.duration))) - Audio Responsive")
+                    
+                    // Set therapy type override for this segment
+                    await frequencyDetector.setTherapyTypeOverride(activeSegment.therapyType)
+                    
+                    // Apply transition delay if needed
+                    let transitionDuration = activeSegment.transitionType.duration
+                    if transitionDuration > 0 {
+                        print("🔄 Applying \(activeSegment.transitionType.rawValue) transition (\(transitionDuration)s)")
+                        
+                        // Stop strobing during transition
+                        if await precisionStrobeController.isCurrentlyStrobing() {
+                            try? await precisionStrobeController.stopStrobing()
+                            currentStrobingFrequency = 0.0
+                        }
+                        
+                        try? await Task.sleep(nanoseconds: UInt64(transitionDuration * 1_000_000_000))
+                    }
+                }
+                
+                // Process audio input with current segment's therapy type override
+                do {
+                    // Perform advanced frequency analysis with therapy type override
+                    let result = try await frequencyDetector.detectFrequencyWithConfidence(from: audioBuffer)
+                    
+                    // Update current frequency for UI display
+                    currentFrequency = result.dominantFrequency
+                    
+                    // Use the therapeutic frequency mapped to the current segment's therapy type
+                    let flashlightFreq = result.therapeuticFrequency
+                    
+                    // Enhanced logging with pattern segment information
+                    if let mapping = result.therapeuticMapping {
+                        let noteInfo = "\(mapping.harmonicAnalysis.closestNote.rawValue)\(mapping.harmonicAnalysis.octave)"
+                        let harmonicInfo = mapping.harmonicAnalysis.isHarmonic ? " 🎵" : ""
+                        
+                        print("🔊 Pattern[\(activeSegment.therapyType.rawValue)]: \(result.dominantFrequency)Hz → \(flashlightFreq)Hz | \(noteInfo)\(harmonicInfo) | Conf: \(result.confidence)")
+                    }
+                    
+                    // Reset no-signal counter on good signal
+                    if result.confidence > 0.05 {
+                        consecutiveNoSignalCount = 0
+                    }
+                    
+                    // Only update strobing if frequency changed significantly and confidence is good
+                    if abs(flashlightFreq - currentStrobingFrequency) > 0.3 && result.confidence > 0.05 {
+                        currentStrobingFrequency = flashlightFreq
+                        
+                        // Stop current strobing
+                        if await precisionStrobeController.isCurrentlyStrobing() {
+                            try await precisionStrobeController.stopStrobing()
+                            try await Task.sleep(nanoseconds: 10_000_000) // 10ms
+                        }
+                        
+                        // Start precision strobing at the new frequency with segment intensity
+                        if flashlightFreq >= 1.0 {
+                            try await precisionStrobeController.startStrobing(
+                                frequency: flashlightFreq,
+                                intensity: activeSegment.intensity
+                            )
+                            print("🎯 Audio-responsive strobing: \(flashlightFreq)Hz (intensity: \(Int(activeSegment.intensity * 100))%)")
+                        } else {
+                            print("⚠️ Frequency too low for strobing: \(flashlightFreq)Hz")
+                            try? await flashlightController.setFlashlight(false)
+                        }
+                    } else if result.confidence <= 0.05 {
+                        consecutiveNoSignalCount += 1
+                        
+                        // Stop strobing if we have too many consecutive weak signals
+                        if consecutiveNoSignalCount >= maxNoSignalCount {
+                            if await precisionStrobeController.isCurrentlyStrobing() {
+                                print("🔇 Stopping strobing due to weak audio signal in pattern mode")
+                                try? await precisionStrobeController.stopStrobing()
+                                currentStrobingFrequency = 0.0
+                                try? await flashlightController.setFlashlight(false)
+                            }
+                        }
+                    }
+                    
+                } catch FrequencyDetector.FrequencyDetectionError.frequencyOutOfRange {
+                    print("⚠️ Audio frequency outside detectable range in pattern segment")
+                    // Stop strobing when no valid audio detected
+                    if await precisionStrobeController.isCurrentlyStrobing() {
+                        try? await precisionStrobeController.stopStrobing()
+                        currentStrobingFrequency = 0.0
+                    }
+                    try? await flashlightController.setFlashlight(false)
+                    currentFrequency = 0.0
+                } catch {
+                    print("Error in audio-responsive pattern processing: \(error)")
+                    // Stop strobing on any error
+                    if await precisionStrobeController.isCurrentlyStrobing() {
+                        try? await precisionStrobeController.stopStrobing()
+                        currentStrobingFrequency = 0.0
+                    }
+                    try? await flashlightController.setFlashlight(false)
+                    currentFrequency = 0.0
+                }
+                
+            } else {
+                // No active segment - this shouldn't happen with valid patterns
+                print("⚠️ No active segment found at time \(elapsed)s in audio-responsive pattern")
+                currentPatternSegment = nil
+                
+                // Clear therapy type override
+                await frequencyDetector.setTherapyTypeOverride(nil)
+                
+                // Stop strobing if no active segment
+                if await precisionStrobeController.isCurrentlyStrobing() {
+                    try? await precisionStrobeController.stopStrobing()
+                    currentStrobingFrequency = 0.0
+                }
+            }
+        }
+        
+        // Clear therapy type override when session ends
+        await frequencyDetector.setTherapyTypeOverride(nil)
+        
+        // Ensure strobing is stopped when processing ends
+        if await precisionStrobeController.isCurrentlyStrobing() {
+            try? await precisionStrobeController.stopStrobing()
+        }
+        
+        print("🔆 Audio-responsive pattern session processing completed")
+    }
+    
     private func formatDuration(_ duration: TimeInterval) -> String {
         let minutes = Int(duration) / 60
         let seconds = Int(duration) % 60
@@ -637,6 +849,11 @@ public actor TherapySessionCoordinator {
     /// Check if currently running a pattern-based session
     public func isPatternBasedSession() async -> Bool {
         return currentSessionPattern != nil
+    }
+    
+    /// Check if currently running an audio-responsive pattern session
+    public func isAudioResponsivePatternSession() async -> Bool {
+        return currentSessionPattern != nil && audioStream != nil
     }
 
 }
